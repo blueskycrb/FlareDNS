@@ -340,6 +340,7 @@
         // Login Button
         [self.loginButton.topAnchor constraintEqualToAnchor:self.loginContainerView.topAnchor constant:12],
         [self.loginButton.leadingAnchor constraintEqualToAnchor:self.loginContainerView.leadingAnchor constant:16],
+        [self.loginButton.trailingAnchor constraintEqualToAnchor:loginArrow.leadingAnchor constant:-8],
         [self.loginButton.heightAnchor constraintEqualToConstant:30],
         
         // Login Arrow
@@ -355,6 +356,7 @@
         // Help Button
         [self.helpButton.topAnchor constraintEqualToAnchor:loginSeparator.bottomAnchor constant:12],
         [self.helpButton.leadingAnchor constraintEqualToAnchor:self.loginContainerView.leadingAnchor constant:16],
+        [self.helpButton.trailingAnchor constraintEqualToAnchor:helpArrow.leadingAnchor constant:-8],
         [self.helpButton.bottomAnchor constraintEqualToAnchor:self.loginContainerView.bottomAnchor constant:-12],
         [self.helpButton.heightAnchor constraintEqualToConstant:30],
         
