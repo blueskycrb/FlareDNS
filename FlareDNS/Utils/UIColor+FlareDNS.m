@@ -10,28 +10,59 @@
 @implementation UIColor (FlareDNS)
 
 + (UIColor *)cf_primaryBackgroundColor {
-    return [UIColor colorWithRed:0.0 green:0.0 blue:0.0 alpha:1.0];
+    // iOS 16+ supports dynamic colors via trait collections.
+    return [UIColor colorWithDynamicProvider:^UIColor * _Nonnull(UITraitCollection * _Nonnull traitCollection) {
+        if (traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+            return [UIColor colorWithRed:0.0 green:0.0 blue:0.0 alpha:1.0];
+        }
+        return [UIColor whiteColor];
+    }];
 }
 
 + (UIColor *)cf_secondaryBackgroundColor {
-    // Slightly lighter for better contrast with dark background
-    return [UIColor colorWithRed:0.15 green:0.15 blue:0.16 alpha:1.0];
+    // Secondary card-like surface (dynamic for Light/Dark).
+    return [UIColor colorWithDynamicProvider:^UIColor * _Nonnull(UITraitCollection * _Nonnull traitCollection) {
+        if (traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+            // Slightly lighter for better contrast with dark background
+            return [UIColor colorWithRed:0.15 green:0.15 blue:0.16 alpha:1.0];
+        }
+        // A subtle elevated surface in light mode
+        return [UIColor colorWithRed:0.95 green:0.95 blue:0.97 alpha:1.0];
+    }];
 }
 
 + (UIColor *)cf_groupedBackgroundColor {
-    return [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1.0];
+    // Background behind inset/grouped lists (dynamic for Light/Dark).
+    return [UIColor colorWithDynamicProvider:^UIColor * _Nonnull(UITraitCollection * _Nonnull traitCollection) {
+        if (traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+            return [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1.0];
+        }
+        return [UIColor colorWithRed:0.97 green:0.97 blue:0.99 alpha:1.0];
+    }];
 }
 
 + (UIColor *)cf_primaryTextColor {
-    return [UIColor whiteColor];
+    return [UIColor colorWithDynamicProvider:^UIColor * _Nonnull(UITraitCollection * _Nonnull traitCollection) {
+        return (traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) ? [UIColor whiteColor] : [UIColor blackColor];
+    }];
 }
 
 + (UIColor *)cf_secondaryTextColor {
-    return [UIColor colorWithRed:0.56 green:0.56 blue:0.58 alpha:1.0];
+    return [UIColor colorWithDynamicProvider:^UIColor * _Nonnull(UITraitCollection * _Nonnull traitCollection) {
+        if (traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+            return [UIColor colorWithRed:0.56 green:0.56 blue:0.58 alpha:1.0];
+        }
+        return [UIColor colorWithRed:0.38 green:0.38 blue:0.40 alpha:1.0];
+    }];
 }
 
 + (UIColor *)cf_tertiaryTextColor {
-    return [UIColor colorWithRed:0.40 green:0.40 blue:0.42 alpha:1.0];
+    return [UIColor colorWithDynamicProvider:^UIColor * _Nonnull(UITraitCollection * _Nonnull traitCollection) {
+        if (traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+            return [UIColor colorWithRed:0.40 green:0.40 blue:0.42 alpha:1.0];
+        }
+        return [UIColor colorWithRed:0.55 green:0.55 blue:0.57 alpha:1.0];
+    }];
 }
 
 + (UIColor *)cf_accentColor {
