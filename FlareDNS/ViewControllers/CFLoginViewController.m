@@ -214,6 +214,7 @@
     // Arrow for login
     UIImageView *loginArrow = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"arrow.right"]];
     loginArrow.translatesAutoresizingMaskIntoConstraints = NO;
+    loginArrow.contentMode = UIViewContentModeScaleAspectFit;
     loginArrow.tintColor = accentColor;
     loginArrow.tag = 101;
     [self.loginContainerView addSubview:loginArrow];
@@ -244,6 +245,7 @@
     // Help arrow
     UIImageView *helpArrow = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"chevron.right"]];
     helpArrow.translatesAutoresizingMaskIntoConstraints = NO;
+    helpArrow.contentMode = UIViewContentModeScaleAspectFit;
     helpArrow.tintColor = secondaryText;
     helpArrow.tag = 103;
     [self.loginContainerView addSubview:helpArrow];
@@ -346,6 +348,8 @@
         // Login Arrow
         [loginArrow.centerYAnchor constraintEqualToAnchor:self.loginButton.centerYAnchor],
         [loginArrow.trailingAnchor constraintEqualToAnchor:self.loginContainerView.trailingAnchor constant:-16],
+        [loginArrow.widthAnchor constraintEqualToConstant:20],
+        [loginArrow.heightAnchor constraintEqualToConstant:20],
         
         // Login Separator
         [loginSeparator.topAnchor constraintEqualToAnchor:self.loginButton.bottomAnchor constant:12],
@@ -363,6 +367,8 @@
         // Help Arrow
         [helpArrow.centerYAnchor constraintEqualToAnchor:self.helpButton.centerYAnchor],
         [helpArrow.trailingAnchor constraintEqualToAnchor:self.loginContainerView.trailingAnchor constant:-16],
+        [helpArrow.widthAnchor constraintEqualToConstant:20],
+        [helpArrow.heightAnchor constraintEqualToConstant:20],
         
         // Activity Indicator
         [self.activityIndicator.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],

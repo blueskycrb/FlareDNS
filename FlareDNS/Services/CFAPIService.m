@@ -6,6 +6,7 @@
 //
 
 #import "CFAPIService.h"
+#import <UIKit/UIKit.h>
 
 static NSString *const kBaseURL = @"https://api.cloudflare.com/client/v4";
 
@@ -51,6 +52,23 @@ static NSString *const kBaseURL = @"https://api.cloudflare.com/client/v4";
 - (void)performRequest:(NSURLRequest *)request completion:(CFAPICompletionBlock)completion {
     NSURLSessionDataTask *task = [self.session dataTaskWithRequest:request completionHandler:^(NSData * _Nullable data, NSURLResponse * _Nullable response, NSError * _Nullable error) {
         if (error) {
+            // Check if error is due to app entering background
+            // NSURLErrorCancelled (-999) or NSURLErrorNetworkConnectionLost (-1005)
+            NSInteger errorCode = error.code;
+            BOOL isBackgroundError = (errorCode == NSURLErrorCancelled || 
+                                      errorCode == NSURLErrorNetworkConnectionLost ||
+                                      errorCode == NSURLErrorTimedOut);
+            
+            // Check if app is in background
+            UIApplicationState appState = [UIApplication sharedApplication].applicationState;
+            BOOL isInBackground = (appState == UIApplicationStateBackground || appState == UIApplicationStateInactive);
+            
+            // If error is due to app entering background, silently ignore it
+            if (isBackgroundError && isInBackground) {
+                // Silently ignore - don't call completion to avoid showing error
+                return;
+            }
+            
             dispatch_async(dispatch_get_main_queue(), ^{
                 completion(nil, error);
             });
@@ -474,11 +492,30 @@ static NSString *const kBaseURL = @"https://api.cloudflare.com/client/v4";
     }
     
     NSURLSessionDataTask *task = [[NSURLSession sharedSession] dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (error) {
-                completion(nil, error);
+        if (error) {
+            // Check if error is due to app entering background
+            NSInteger errorCode = error.code;
+            BOOL isBackgroundError = (errorCode == NSURLErrorCancelled || 
+                                      errorCode == NSURLErrorNetworkConnectionLost ||
+                                      errorCode == NSURLErrorTimedOut);
+            
+            // Check if app is in background
+            UIApplicationState appState = [UIApplication sharedApplication].applicationState;
+            BOOL isInBackground = (appState == UIApplicationStateBackground || appState == UIApplicationStateInactive);
+            
+            // If error is due to app entering background, silently ignore it
+            if (isBackgroundError && isInBackground) {
+                // Silently ignore - don't call completion to avoid showing error
                 return;
             }
+            
+            dispatch_async(dispatch_get_main_queue(), ^{
+                completion(nil, error);
+            });
+            return;
+        }
+        
+        dispatch_async(dispatch_get_main_queue(), ^{
             
             NSError *parseError;
             NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:&parseError];
