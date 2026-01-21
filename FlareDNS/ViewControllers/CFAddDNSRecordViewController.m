@@ -106,6 +106,8 @@
     self.tableView.delegate = self;
     self.tableView.dataSource = self;
     self.tableView.backgroundColor = backgroundColor;
+    self.tableView.rowHeight = UITableViewAutomaticDimension;
+    self.tableView.estimatedRowHeight = 60;
     [self.view addSubview:self.tableView];
     
     // Activity indicator
@@ -241,23 +243,11 @@
 - (void)configureNameCell:(UITableViewCell *)cell {
     cell.textLabel.text = @"Name";
     
-    // Domain suffix label
-    UILabel *suffixLabel = [[UILabel alloc] init];
-    suffixLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    suffixLabel.text = [NSString stringWithFormat:@".%@", self.zone.name];
-    suffixLabel.font = [UIFont systemFontOfSize:16];
-    if (@available(iOS 26.0, *)) {
-        suffixLabel.textColor = [UIColor tertiaryLabelColor];
-    } else {
-        suffixLabel.textColor = [UIColor colorWithWhite:0.5 alpha:1.0];
-    }
-    [cell.contentView addSubview:suffixLabel];
-    
-    // Text field for subdomain
+    // Text field for subdomain (only accepts subdomain or @)
     UITextField *textField = [[UITextField alloc] init];
     textField.translatesAutoresizingMaskIntoConstraints = NO;
     textField.text = [self.name isEqualToString:@"@"] ? @"" : self.name;
-    textField.placeholder = @"@ for root";
+    textField.placeholder = @"@ or subdomain";
     if (@available(iOS 26.0, *)) {
         textField.textColor = [UIColor labelColor];
     } else {
@@ -275,17 +265,34 @@
     } else {
         placeholderColor = [UIColor colorWithWhite:0.5 alpha:1.0];
     }
-    textField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:@"@ for root" attributes:@{NSForegroundColorAttributeName: placeholderColor}];
+    textField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:@"@ or subdomain" attributes:@{NSForegroundColorAttributeName: placeholderColor}];
     
     [cell.contentView addSubview:textField];
     
+    // Full domain preview label (below text field)
+    UILabel *previewLabel = [[UILabel alloc] init];
+    previewLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    previewLabel.tag = 100; // Tag to find it later for updates
+    previewLabel.font = [UIFont systemFontOfSize:12];
+    if (@available(iOS 26.0, *)) {
+        previewLabel.textColor = [UIColor secondaryLabelColor];
+    } else {
+        previewLabel.textColor = [UIColor cf_secondaryTextColor];
+    }
+    previewLabel.textAlignment = NSTextAlignmentRight;
+    [cell.contentView addSubview:previewLabel];
+    
+    // Update preview
+    [self updateNamePreview:previewLabel];
+    
     [NSLayoutConstraint activateConstraints:@[
-        [suffixLabel.centerYAnchor constraintEqualToAnchor:cell.contentView.centerYAnchor],
-        [suffixLabel.trailingAnchor constraintEqualToAnchor:cell.contentView.trailingAnchor constant:-16],
+        [textField.centerYAnchor constraintEqualToAnchor:cell.contentView.centerYAnchor constant:-8],
+        [textField.trailingAnchor constraintEqualToAnchor:cell.contentView.trailingAnchor constant:-16],
+        [textField.leadingAnchor constraintGreaterThanOrEqualToAnchor:cell.textLabel.trailingAnchor constant:16],
         
-        [textField.centerYAnchor constraintEqualToAnchor:cell.contentView.centerYAnchor],
-        [textField.trailingAnchor constraintEqualToAnchor:suffixLabel.leadingAnchor constant:-2],
-        [textField.widthAnchor constraintEqualToConstant:120]
+        [previewLabel.topAnchor constraintEqualToAnchor:textField.bottomAnchor constant:4],
+        [previewLabel.trailingAnchor constraintEqualToAnchor:cell.contentView.trailingAnchor constant:-16],
+        [previewLabel.leadingAnchor constraintGreaterThanOrEqualToAnchor:cell.textLabel.trailingAnchor constant:16]
     ]];
 }
 
@@ -405,10 +412,47 @@
 
 - (void)textFieldDidChange:(UITextField *)textField {
     if (textField.tag == 1) {
-        self.name = textField.text;
+        NSString *input = textField.text;
+        
+        // Auto-remove domain suffix if user accidentally includes it
+        NSString *zoneSuffix = [NSString stringWithFormat:@".%@", self.zone.name];
+        if ([input hasSuffix:zoneSuffix]) {
+            input = [input substringToIndex:input.length - zoneSuffix.length];
+            textField.text = input;
+        }
+        
+        // If input equals zone name, treat as root domain
+        if ([input isEqualToString:self.zone.name]) {
+            input = @"@";
+            textField.text = @"@";
+        }
+        
+        self.name = input;
+        
+        // Update preview label
+        UITableViewCell *nameCell = (UITableViewCell *)textField.superview.superview;
+        if ([nameCell isKindOfClass:[UITableViewCell class]]) {
+            UILabel *previewLabel = [nameCell.contentView viewWithTag:100];
+            if (previewLabel) {
+                [self updateNamePreview:previewLabel];
+            }
+        }
     } else if (textField.tag == 2) {
         self.content = textField.text;
     }
+}
+
+- (void)updateNamePreview:(UILabel *)previewLabel {
+    NSString *inputName = [self.name stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+    NSString *fullName;
+    
+    if (inputName.length == 0 || [inputName isEqualToString:@"@"]) {
+        fullName = self.zone.name;
+    } else {
+        fullName = [NSString stringWithFormat:@"%@.%@", inputName, self.zone.name];
+    }
+    
+    previewLabel.text = [NSString stringWithFormat:@"→ %@", fullName];
 }
 
 #pragma mark - Switch
