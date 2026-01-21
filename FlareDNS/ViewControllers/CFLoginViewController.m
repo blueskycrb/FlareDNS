@@ -10,7 +10,7 @@
 #import "CFKeychainService.h"
 #import "UIColor+FlareDNS.h"
 
-@interface CFLoginViewController ()
+@interface CFLoginViewController () <UITextFieldDelegate>
 
 @property (nonatomic, strong) UIScrollView *scrollView;
 @property (nonatomic, strong) UIImageView *logoImageView;
@@ -38,6 +38,11 @@
     [self setupUI];
     [self setupConstraints];
     [self loadSavedCredentials];
+    
+    // Add tap gesture to dismiss keyboard
+    UITapGestureRecognizer *tapGesture = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(dismissKeyboard)];
+    tapGesture.cancelsTouchesInView = NO;
+    [self.view addGestureRecognizer:tapGesture];
 }
 
 - (void)setupUI {
@@ -128,6 +133,8 @@
     self.emailTextField.keyboardType = UIKeyboardTypeEmailAddress;
     self.emailTextField.autocapitalizationType = UITextAutocapitalizationTypeNone;
     self.emailTextField.autocorrectionType = UITextAutocorrectionTypeNo;
+    self.emailTextField.returnKeyType = UIReturnKeyNext;
+    self.emailTextField.delegate = self;
     self.emailTextField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:@"Enter your email" attributes:@{NSForegroundColorAttributeName: secondaryText}];
     [self.formContainerView addSubview:self.emailTextField];
     
@@ -155,6 +162,8 @@
     self.apiKeyTextField.secureTextEntry = YES;
     self.apiKeyTextField.autocapitalizationType = UITextAutocapitalizationTypeNone;
     self.apiKeyTextField.autocorrectionType = UITextAutocorrectionTypeNo;
+    self.apiKeyTextField.returnKeyType = UIReturnKeyDone;
+    self.apiKeyTextField.delegate = self;
     self.apiKeyTextField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:@"Enter your API Key" attributes:@{NSForegroundColorAttributeName: secondaryText}];
     [self.formContainerView addSubview:self.apiKeyTextField];
     
@@ -171,13 +180,24 @@
     self.apiKeyHintLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.apiKeyHintLabel.text = @"Your API Key is stored securely on this device.";
     self.apiKeyHintLabel.font = [UIFont systemFontOfSize:13];
-    self.apiKeyHintLabel.textColor = [UIColor cf_secondaryTextColor];
+    self.apiKeyHintLabel.textColor = secondaryText;
     [self.formContainerView addSubview:self.apiKeyHintLabel];
+    
+    // Determine accent color based on iOS version
+    UIColor *accentColor;
+    UIColor *separatorColor;
+    if (@available(iOS 26.0, *)) {
+        accentColor = [UIColor systemBlueColor];
+        separatorColor = [UIColor separatorColor];
+    } else {
+        accentColor = [UIColor cf_accentColor];
+        separatorColor = [UIColor colorWithWhite:0.3 alpha:1.0];
+    }
     
     // Login Container
     self.loginContainerView = [[UIView alloc] init];
     self.loginContainerView.translatesAutoresizingMaskIntoConstraints = NO;
-    self.loginContainerView.backgroundColor = [UIColor cf_secondaryBackgroundColor];
+    self.loginContainerView.backgroundColor = secondaryBackground;
     self.loginContainerView.layer.cornerRadius = 12;
     [self.scrollView addSubview:self.loginContainerView];
     
@@ -185,7 +205,7 @@
     self.loginButton = [UIButton buttonWithType:UIButtonTypeSystem];
     self.loginButton.translatesAutoresizingMaskIntoConstraints = NO;
     [self.loginButton setTitle:@"Login" forState:UIControlStateNormal];
-    [self.loginButton setTitleColor:[UIColor cf_accentColor] forState:UIControlStateNormal];
+    [self.loginButton setTitleColor:accentColor forState:UIControlStateNormal];
     self.loginButton.titleLabel.font = [UIFont systemFontOfSize:17];
     self.loginButton.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
     [self.loginButton addTarget:self action:@selector(loginButtonTapped) forControlEvents:UIControlEventTouchUpInside];
@@ -194,14 +214,14 @@
     // Arrow for login
     UIImageView *loginArrow = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"arrow.right"]];
     loginArrow.translatesAutoresizingMaskIntoConstraints = NO;
-    loginArrow.tintColor = [UIColor cf_accentColor];
+    loginArrow.tintColor = accentColor;
     loginArrow.tag = 101;
     [self.loginContainerView addSubview:loginArrow];
     
     // Separator for login container
     UIView *loginSeparator = [[UIView alloc] init];
     loginSeparator.translatesAutoresizingMaskIntoConstraints = NO;
-    loginSeparator.backgroundColor = [UIColor colorWithWhite:0.3 alpha:1.0];
+    loginSeparator.backgroundColor = separatorColor;
     loginSeparator.tag = 102;
     [self.loginContainerView addSubview:loginSeparator];
     
@@ -211,10 +231,10 @@
     
     NSMutableAttributedString *helpText = [[NSMutableAttributedString alloc] init];
     NSTextAttachment *helpIcon = [[NSTextAttachment alloc] init];
-    helpIcon.image = [[UIImage systemImageNamed:@"questionmark.circle.fill"] imageWithTintColor:[UIColor cf_accentColor]];
+    helpIcon.image = [[UIImage systemImageNamed:@"questionmark.circle.fill"] imageWithTintColor:accentColor];
     helpIcon.bounds = CGRectMake(0, -3, 18, 18);
     [helpText appendAttributedString:[NSAttributedString attributedStringWithAttachment:helpIcon]];
-    [helpText appendAttributedString:[[NSAttributedString alloc] initWithString:@"  How to get API Key?" attributes:@{NSForegroundColorAttributeName: [UIColor cf_accentColor], NSFontAttributeName: [UIFont systemFontOfSize:17]}]];
+    [helpText appendAttributedString:[[NSAttributedString alloc] initWithString:@"  How to get API Key?" attributes:@{NSForegroundColorAttributeName: accentColor, NSFontAttributeName: [UIFont systemFontOfSize:17]}]];
     
     [self.helpButton setAttributedTitle:helpText forState:UIControlStateNormal];
     self.helpButton.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
@@ -224,7 +244,7 @@
     // Help arrow
     UIImageView *helpArrow = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"chevron.right"]];
     helpArrow.translatesAutoresizingMaskIntoConstraints = NO;
-    helpArrow.tintColor = [UIColor cf_secondaryTextColor];
+    helpArrow.tintColor = secondaryText;
     helpArrow.tag = 103;
     [self.loginContainerView addSubview:helpArrow];
     
@@ -412,6 +432,24 @@
                                                             preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
     [self presentViewController:alert animated:YES completion:nil];
+}
+
+#pragma mark - UITextFieldDelegate
+
+- (BOOL)textFieldShouldReturn:(UITextField *)textField {
+    if (textField == self.emailTextField) {
+        // Move to API Key field
+        [self.apiKeyTextField becomeFirstResponder];
+    } else if (textField == self.apiKeyTextField) {
+        // Dismiss keyboard and attempt login
+        [textField resignFirstResponder];
+        [self loginButtonTapped];
+    }
+    return YES;
+}
+
+- (void)dismissKeyboard {
+    [self.view endEditing:YES];
 }
 
 @end

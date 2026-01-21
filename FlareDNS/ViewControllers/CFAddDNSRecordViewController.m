@@ -9,7 +9,7 @@
 #import "CFAPIService.h"
 #import "UIColor+FlareDNS.h"
 
-@interface CFAddDNSRecordViewController () <UITableViewDelegate, UITableViewDataSource>
+@interface CFAddDNSRecordViewController () <UITableViewDelegate, UITableViewDataSource, UITextFieldDelegate>
 
 @property (nonatomic, strong) CFZone *zone;
 @property (nonatomic, strong, nullable) CFDNSRecord *existingRecord;
@@ -68,6 +68,11 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     [self setupUI];
+    
+    // Add tap gesture to dismiss keyboard
+    UITapGestureRecognizer *tapGesture = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(dismissKeyboard)];
+    tapGesture.cancelsTouchesInView = NO;
+    [self.view addGestureRecognizer:tapGesture];
 }
 
 - (void)setupUI {
@@ -256,6 +261,8 @@
     textField.textAlignment = NSTextAlignmentRight;
     textField.autocapitalizationType = UITextAutocapitalizationTypeNone;
     textField.autocorrectionType = UITextAutocorrectionTypeNo;
+    textField.returnKeyType = UIReturnKeyNext;
+    textField.delegate = self;
     textField.tag = 1;
     [textField addTarget:self action:@selector(textFieldDidChange:) forControlEvents:UIControlEventEditingChanged];
     
@@ -311,6 +318,8 @@
     textField.textAlignment = NSTextAlignmentRight;
     textField.autocapitalizationType = UITextAutocapitalizationTypeNone;
     textField.autocorrectionType = UITextAutocorrectionTypeNo;
+    textField.returnKeyType = UIReturnKeyDone;
+    textField.delegate = self;
     textField.tag = 2;
     [textField addTarget:self action:@selector(textFieldDidChange:) forControlEvents:UIControlEventEditingChanged];
     
@@ -459,6 +468,41 @@
 
 - (void)proxySwitchChanged:(UISwitch *)sender {
     self.proxied = sender.on;
+}
+
+#pragma mark - UITextFieldDelegate
+
+- (BOOL)textFieldShouldReturn:(UITextField *)textField {
+    if (textField.tag == 1) {
+        // Name field - move to Content field
+        // Find Content textField in the table view
+        NSIndexPath *contentIndexPath = [NSIndexPath indexPathForRow:2 inSection:0];
+        UITableViewCell *contentCell = [self.tableView cellForRowAtIndexPath:contentIndexPath];
+        if (contentCell) {
+            UITextField *contentTextField = nil;
+            for (UIView *subview in contentCell.contentView.subviews) {
+                if ([subview isKindOfClass:[UITextField class]] && ((UITextField *)subview).tag == 2) {
+                    contentTextField = (UITextField *)subview;
+                    break;
+                }
+            }
+            if (contentTextField) {
+                [contentTextField becomeFirstResponder];
+            } else {
+                [textField resignFirstResponder];
+            }
+        } else {
+            [textField resignFirstResponder];
+        }
+    } else if (textField.tag == 2) {
+        // Content field - dismiss keyboard
+        [textField resignFirstResponder];
+    }
+    return YES;
+}
+
+- (void)dismissKeyboard {
+    [self.view endEditing:YES];
 }
 
 #pragma mark - Helpers
