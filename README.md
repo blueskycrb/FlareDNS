@@ -5,16 +5,17 @@
 [![Cloudflare](https://img.shields.io/badge/Cloudflare-API-orange.svg)](https://api.cloudflare.com/)
 [![App Store](https://img.shields.io/badge/App_Store-Coming_Soon-black?logo=apple)](https://apps.apple.com/app/id6758071138)
 [![TestFlight](https://img.shields.io/badge/TestFlight-Join_Beta-007AFF?logo=apple-testflight)](https://testflight.apple.com/join/3DtJwCzt)
+[![Sponsor](https://img.shields.io/badge/Sponsor-GitHub-EA4AAA?logo=github-sponsors)](https://github.com/sponsors/missuo)
 
 **CFlareDNS** is a lightweight, secure, and powerful iOS application designed for managing your Cloudflare domains and DNS records on the go. Built with native performance in mind, it provides a seamless experience for developers and system administrators to monitor and tweak their network settings anytime, anywhere.
 
 ## 📱 Screenshots
 
 <p align="center">
-  <img src="FlareDNS1.png" width="23%" />
-  <img src="FlareDNS2.png" width="23%" />
-  <img src="FlareDNS3.png" width="23%" />
-  <img src="FlareDNS4.png" width="23%" />
+  <img src="ScreenShots/FlareDNS1.png" width="23%" />
+  <img src="ScreenShots/FlareDNS2.png" width="23%" />
+  <img src="ScreenShots/FlareDNS3.png" width="23%" />
+  <img src="ScreenShots/FlareDNS4.png" width="23%" />
 </p>
 
 ## ✨ Features
@@ -50,6 +51,19 @@ We take your security seriously. CFlareDNS uses the **System Keychain** to store
 - Your keys are encrypted at rest.
 - Your keys are not included in device backups (unless encrypted).
 - No data is ever uploaded to our own servers.
+
+### 🛡️ Safety & Compliance
+
+CFlareDNS interacts directly with the **official Cloudflare API** and strictly adheres to the [Cloudflare API Documentation](https://developers.cloudflare.com/api/). 
+- **No Account Risk**: All actions are performed via authenticated requests using your own credentials.
+- **Official Integration**: There is zero risk of account suspension or bans, as the app operates as a standard API client within Cloudflare's supported development framework.
+
+## 💖 Support the Project
+
+If you find CFlareDNS helpful, consider supporting its development!
+
+- **Sponsor via GitHub**: [@missuo](https://github.com/sponsors/missuo)
+- **Star the repo**: It helps more people discover the tool.
 
 ## 🤝 Contributing
 
