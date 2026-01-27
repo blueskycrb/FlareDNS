@@ -400,6 +400,7 @@ static NSString *const kBaseURL = @"https://api.cloudflare.com/client/v4";
     if (useDailyAggregation) {
         // Use date format for daily aggregation
         NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
+        dateFormatter.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
         dateFormatter.dateFormat = @"yyyy-MM-dd";
         dateFormatter.timeZone = [NSTimeZone timeZoneWithAbbreviation:@"UTC"];
         
@@ -436,6 +437,7 @@ static NSString *const kBaseURL = @"https://api.cloudflare.com/client/v4";
     } else {
         // Use datetime format for hourly aggregation
         NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+        formatter.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
         formatter.dateFormat = @"yyyy-MM-dd'T'HH:mm:ss'Z'";
         formatter.timeZone = [NSTimeZone timeZoneWithAbbreviation:@"UTC"];
         
