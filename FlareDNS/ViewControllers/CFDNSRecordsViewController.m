@@ -165,7 +165,7 @@ static NSString *const kRecordCellIdentifier = @"RecordCell";
 }
 
 - (void)addButtonTapped {
-    CFAddDNSRecordViewController *addVC = [[CFAddDNSRecordViewController alloc] initWithZone:self.zone record:nil];
+    CFAddDNSRecordViewController *addVC = [[CFAddDNSRecordViewController alloc] initWithZone:self.zone record:nil existingRecords:self.records];
     addVC.delegate = self;
     UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:addVC];
     nav.modalPresentationStyle = UIModalPresentationPageSheet;
@@ -209,7 +209,7 @@ static NSString *const kRecordCellIdentifier = @"RecordCell";
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
     
     CFDNSRecord *record = self.filteredRecords[indexPath.row];
-    CFAddDNSRecordViewController *editVC = [[CFAddDNSRecordViewController alloc] initWithZone:self.zone record:record];
+    CFAddDNSRecordViewController *editVC = [[CFAddDNSRecordViewController alloc] initWithZone:self.zone record:record existingRecords:self.records];
     editVC.delegate = self;
     UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:editVC];
     nav.modalPresentationStyle = UIModalPresentationPageSheet;

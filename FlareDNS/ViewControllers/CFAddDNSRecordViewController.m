@@ -13,6 +13,7 @@
 
 @property (nonatomic, strong) CFZone *zone;
 @property (nonatomic, strong, nullable) CFDNSRecord *existingRecord;
+@property (nonatomic, strong) NSArray<CFDNSRecord *> *existingRecords;
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) UIActivityIndicatorView *activityIndicator;
 
@@ -23,16 +24,21 @@
 @property (nonatomic, assign) NSInteger ttl;
 @property (nonatomic, assign) BOOL proxied;
 
+// Suggestions
+@property (nonatomic, strong) NSArray<NSDictionary *> *suggestions;
+
 @end
 
 @implementation CFAddDNSRecordViewController
 
-- (instancetype)initWithZone:(CFZone *)zone record:(nullable CFDNSRecord *)record {
+- (instancetype)initWithZone:(CFZone *)zone record:(nullable CFDNSRecord *)record existingRecords:(NSArray<CFDNSRecord *> *)existingRecords {
     self = [super init];
     if (self) {
         _zone = zone;
         _existingRecord = record;
-        
+        _existingRecords = existingRecords ?: @[];
+        _suggestions = @[];
+
         if (record) {
             _recordType = record.type;
             _content = record.content;
@@ -68,7 +74,8 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     [self setupUI];
-    
+    [self rebuildSuggestions];
+
     // Add tap gesture to dismiss keyboard
     UITapGestureRecognizer *tapGesture = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(dismissKeyboard)];
     tapGesture.cancelsTouchesInView = NO;
@@ -195,16 +202,19 @@
 #pragma mark - UITableViewDataSource
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return 1;
+    return (self.suggestions.count > 0) ? 2 : 1;
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+    if (section == 1) {
+        return self.suggestions.count;
+    }
     return 5;
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:nil];
-    
+
     // Adapt colors based on iOS version
     if (@available(iOS 26.0, *)) {
         cell.backgroundColor = [UIColor secondarySystemGroupedBackgroundColor];
@@ -216,7 +226,17 @@
         cell.detailTextLabel.textColor = [UIColor cf_secondaryTextColor];
     }
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
-    
+
+    if (indexPath.section == 1) {
+        // Suggestions section
+        NSDictionary *suggestion = self.suggestions[indexPath.row];
+        cell.textLabel.text = suggestion[@"content"];
+        NSInteger count = [suggestion[@"count"] integerValue];
+        cell.detailTextLabel.text = [NSString stringWithFormat:@"used %ldx", (long)count];
+        cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+        return cell;
+    }
+
     switch (indexPath.row) {
         case 0: // Record Type
             [self configureRecordTypeCell:cell];
@@ -234,7 +254,7 @@
             [self configureProxyCell:cell];
             break;
     }
-    
+
     return cell;
 }
 
@@ -359,9 +379,35 @@
 
 #pragma mark - UITableViewDelegate
 
+- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
+    if (section == 1) {
+        return @"Suggestions";
+    }
+    return nil;
+}
+
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
-    
+
+    if (indexPath.section == 1) {
+        // Tapped a suggestion — fill content field
+        NSDictionary *suggestion = self.suggestions[indexPath.row];
+        self.content = suggestion[@"content"];
+
+        // Update the content text field in the form
+        NSIndexPath *contentIndexPath = [NSIndexPath indexPathForRow:2 inSection:0];
+        UITableViewCell *contentCell = [self.tableView cellForRowAtIndexPath:contentIndexPath];
+        if (contentCell) {
+            for (UIView *subview in contentCell.contentView.subviews) {
+                if ([subview isKindOfClass:[UITextField class]] && ((UITextField *)subview).tag == 2) {
+                    ((UITextField *)subview).text = self.content;
+                    break;
+                }
+            }
+        }
+        return;
+    }
+
     if (indexPath.row == 0) {
         [self showRecordTypePicker];
     } else if (indexPath.row == 3) {
@@ -379,6 +425,7 @@
         CFDNSRecordType type = [CFDNSRecord typeFromString:typeStr];
         UIAlertAction *action = [UIAlertAction actionWithTitle:typeStr style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
             self.recordType = type;
+            [self rebuildSuggestions];
             [self.tableView reloadData];
         }];
         
@@ -503,6 +550,44 @@
 
 - (void)dismissKeyboard {
     [self.view endEditing:YES];
+}
+
+#pragma mark - Suggestions
+
+- (void)rebuildSuggestions {
+    // Only show suggestions for A and CNAME record types
+    if (self.recordType != CFDNSRecordTypeA && self.recordType != CFDNSRecordTypeCNAME) {
+        self.suggestions = @[];
+        return;
+    }
+
+    // Count occurrences of each content value for the current record type
+    NSCountedSet *contentCounts = [[NSCountedSet alloc] init];
+    for (CFDNSRecord *record in self.existingRecords) {
+        if (record.type == self.recordType && record.content.length > 0) {
+            [contentCounts addObject:record.content];
+        }
+    }
+
+    if (contentCounts.count == 0) {
+        self.suggestions = @[];
+        return;
+    }
+
+    // Build array of {content, count} dictionaries sorted by count descending
+    NSMutableArray<NSDictionary *> *results = [NSMutableArray array];
+    for (NSString *content in contentCounts) {
+        [results addObject:@{
+            @"content": content,
+            @"count": @([contentCounts countForObject:content])
+        }];
+    }
+
+    [results sortUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) {
+        return [b[@"count"] compare:a[@"count"]];
+    }];
+
+    self.suggestions = [results copy];
 }
 
 #pragma mark - Helpers

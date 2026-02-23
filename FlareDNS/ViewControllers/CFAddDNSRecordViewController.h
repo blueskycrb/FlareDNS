@@ -22,7 +22,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, weak) id<CFAddDNSRecordViewControllerDelegate> delegate;
 
-- (instancetype)initWithZone:(CFZone *)zone record:(nullable CFDNSRecord *)record;
+- (instancetype)initWithZone:(CFZone *)zone record:(nullable CFDNSRecord *)record existingRecords:(NSArray<CFDNSRecord *> *)existingRecords;
 
 @end
 
