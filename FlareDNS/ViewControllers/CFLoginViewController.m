@@ -76,9 +76,9 @@
     self.logoImageView = [[UIImageView alloc] init];
     self.logoImageView.translatesAutoresizingMaskIntoConstraints = NO;
     self.logoImageView.contentMode = UIViewContentModeScaleAspectFit;
-    self.logoImageView.image = [UIImage systemImageNamed:@"cloud.fill"];
-    self.logoImageView.tintColor = [UIColor cf_orangeColor];
-    self.logoImageView.backgroundColor = [UIColor colorWithRed:0.3 green:0.4 blue:0.5 alpha:1.0];
+    NSString *iconName = [[NSBundle mainBundle].infoDictionary[@"CFBundleIcons"][@"CFBundlePrimaryIcon"][@"CFBundleIconFiles"] lastObject];
+    UIImage *appIcon = iconName ? [UIImage imageNamed:iconName] : [UIImage systemImageNamed:@"cloud.fill"];
+    self.logoImageView.image = appIcon;
     self.logoImageView.layer.cornerRadius = 20;
     self.logoImageView.clipsToBounds = YES;
     [self.scrollView addSubview:self.logoImageView];
