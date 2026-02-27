@@ -9,6 +9,7 @@
 #import "CFDNSRecordsViewController.h"
 #import "CFTrafficAnalyticsViewController.h"
 #import "CFAPIService.h"
+#import "CFDomainExpiryService.h"
 #import "UIColor+FlareDNS.h"
 
 @interface CFDomainDetailViewController () <UITableViewDelegate, UITableViewDataSource>
@@ -20,6 +21,10 @@
 @property (nonatomic, assign) BOOL developmentMode;
 @property (nonatomic, assign) BOOL isLoadingSettings;
 @property (nonatomic, assign) BOOL hasLoadedSettings;
+@property (nonatomic, copy) NSString *registeredAt;
+@property (nonatomic, copy) NSString *expiresAt;
+@property (nonatomic, assign) BOOL domainExpiryLoaded;
+@property (nonatomic, assign) BOOL domainExpiryError;
 
 @end
 
@@ -114,7 +119,19 @@
         }
         dispatch_group_leave(group);
     }];
-    
+
+    dispatch_group_enter(group);
+    [[CFDomainExpiryService shared] fetchExpiryForDomain:self.zone.name completion:^(NSString * _Nullable registeredAt, NSString * _Nullable expiresAt, NSError * _Nullable error) {
+        if (!error && registeredAt && expiresAt) {
+            self.registeredAt = registeredAt;
+            self.expiresAt = expiresAt;
+        } else {
+            self.domainExpiryError = YES;
+        }
+        self.domainExpiryLoaded = YES;
+        dispatch_group_leave(group);
+    }];
+
     dispatch_group_notify(group, dispatch_get_main_queue(), ^{
         self.isLoadingSettings = NO;
         self.hasLoadedSettings = YES;
@@ -143,16 +160,17 @@
 #pragma mark - UITableViewDataSource
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return 5;
+    return 6;
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     switch (section) {
         case 0: return 1; // Domain Information (Status)
-        case 1: return 2; // Zone Details (DNS Records, Traffic Analytics)
-        case 2: return self.zone.nameServers.count; // Nameservers
-        case 3: return 2; // Security & Performance (SSL Mode, Security Level)
-        case 4: return 2; // Cache Management (Development Mode, Purge Cache)
+        case 1: return 1; // Domain Registration
+        case 2: return 2; // Zone Details (DNS Records, Traffic Analytics)
+        case 3: return self.zone.nameServers.count; // Nameservers
+        case 4: return 2; // Security & Performance (SSL Mode, Security Level)
+        case 5: return 2; // Cache Management (Development Mode, Purge Cache)
         default: return 0;
     }
 }
@@ -160,16 +178,17 @@
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
     switch (section) {
         case 0: return @"DOMAIN INFORMATION";
-        case 1: return @"ZONE DETAILS";
-        case 2: return @"NAMESERVERS";
-        case 3: return @"SECURITY & PERFORMANCE";
-        case 4: return @"CACHE MANAGEMENT";
+        case 1: return @"DOMAIN REGISTRATION";
+        case 2: return @"ZONE DETAILS";
+        case 3: return @"NAMESERVERS";
+        case 4: return @"SECURITY & PERFORMANCE";
+        case 5: return @"CACHE MANAGEMENT";
         default: return nil;
     }
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
-    if (section == 4) {
+    if (section == 5) {
         return @"Development mode bypasses cache and purge cache clears all cached resources.";
     }
     return nil;
@@ -194,20 +213,22 @@
         case 0: // Domain Information
             [self configureStatusCell:cell];
             break;
-        case 1: // Zone Details
+        case 1: // Domain Registration
+            return [self registrationCellForTableView:tableView];
+        case 2: // Zone Details
             [self configureZoneDetailsCell:cell atRow:indexPath.row];
             break;
-        case 2: // Nameservers
+        case 3: // Nameservers
             [self configureNameserverCell:cell atRow:indexPath.row];
             break;
-        case 3: // Security & Performance
+        case 4: // Security & Performance
             [self configureSecurityCell:cell atRow:indexPath.row];
             break;
-        case 4: // Cache Management
+        case 5: // Cache Management
             [self configureCacheCell:cell atRow:indexPath.row];
             break;
     }
-    
+
     return cell;
 }
 
@@ -375,6 +396,178 @@
     ]];
 }
 
+- (UITableViewCell *)registrationCellForTableView:(UITableView *)tableView {
+    UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
+    cell.selectionStyle = UITableViewCellSelectionStyleNone;
+
+    if (@available(iOS 26.0, *)) {
+        cell.backgroundColor = [UIColor secondarySystemGroupedBackgroundColor];
+    } else {
+        cell.backgroundColor = [UIColor cf_secondaryBackgroundColor];
+    }
+
+    if (!self.domainExpiryLoaded) {
+        cell.textLabel.text = @"Loading...";
+        cell.textLabel.textColor = [UIColor secondaryLabelColor];
+        return cell;
+    }
+
+    if (self.domainExpiryError || !self.registeredAt || !self.expiresAt) {
+        cell.textLabel.text = @"Registration info unavailable";
+        cell.textLabel.textColor = [UIColor secondaryLabelColor];
+        return cell;
+    }
+
+    // Parse dates
+    NSDateFormatter *parser = [[NSDateFormatter alloc] init];
+    parser.locale = [[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"];
+    parser.dateFormat = @"yyyy-MM-dd'T'HH:mm:ss'Z'";
+    parser.timeZone = [NSTimeZone timeZoneForSecondsFromGMT:0];
+
+    NSDate *regDate = [parser dateFromString:self.registeredAt];
+    NSDate *expDate = [parser dateFromString:self.expiresAt];
+
+    // Try alternative format without time
+    if (!regDate || !expDate) {
+        parser.dateFormat = @"yyyy-MM-dd";
+        if (!regDate) regDate = [parser dateFromString:self.registeredAt];
+        if (!expDate) expDate = [parser dateFromString:self.expiresAt];
+    }
+
+    if (!regDate || !expDate) {
+        cell.textLabel.text = @"Registration info unavailable";
+        cell.textLabel.textColor = [UIColor secondaryLabelColor];
+        return cell;
+    }
+
+    // Format for display
+    NSDateFormatter *displayFormatter = [[NSDateFormatter alloc] init];
+    displayFormatter.dateStyle = NSDateFormatterMediumStyle;
+    displayFormatter.timeStyle = NSDateFormatterNoStyle;
+
+    NSString *regStr = [displayFormatter stringFromDate:regDate];
+    NSString *expStr = [displayFormatter stringFromDate:expDate];
+
+    // Calculate progress
+    NSTimeInterval totalInterval = [expDate timeIntervalSinceDate:regDate];
+    NSTimeInterval elapsedInterval = [[NSDate date] timeIntervalSinceDate:regDate];
+    float progress = (totalInterval > 0) ? (float)(elapsedInterval / totalInterval) : 0;
+    progress = fminf(fmaxf(progress, 0.0f), 1.0f);
+    float remaining = 1.0f - progress;
+
+    // Determine color
+    UIColor *progressColor;
+    if (remaining > 0.5f) {
+        progressColor = [UIColor systemGreenColor];
+    } else if (remaining > 0.25f) {
+        progressColor = [UIColor systemOrangeColor];
+    } else {
+        progressColor = [UIColor systemRedColor];
+    }
+
+    // Build custom content
+    cell.textLabel.text = nil;
+
+    UIView *container = [[UIView alloc] init];
+    container.translatesAutoresizingMaskIntoConstraints = NO;
+    [cell.contentView addSubview:container];
+
+    [NSLayoutConstraint activateConstraints:@[
+        [container.topAnchor constraintEqualToAnchor:cell.contentView.topAnchor constant:10],
+        [container.leadingAnchor constraintEqualToAnchor:cell.contentView.leadingAnchor constant:16],
+        [container.trailingAnchor constraintEqualToAnchor:cell.contentView.trailingAnchor constant:-16],
+        [container.bottomAnchor constraintEqualToAnchor:cell.contentView.bottomAnchor constant:-12]
+    ]];
+
+    // Top row: Registered on left, Expires on right
+    UILabel *regTitleLabel = [[UILabel alloc] init];
+    regTitleLabel.text = @"Registered";
+    regTitleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    regTitleLabel.textColor = [UIColor secondaryLabelColor];
+    regTitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
+
+    UILabel *regDateLabel = [[UILabel alloc] init];
+    regDateLabel.text = regStr;
+    regDateLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightRegular];
+    if (@available(iOS 26.0, *)) {
+        regDateLabel.textColor = [UIColor labelColor];
+    } else {
+        regDateLabel.textColor = [UIColor cf_primaryTextColor];
+    }
+    regDateLabel.translatesAutoresizingMaskIntoConstraints = NO;
+
+    UILabel *expTitleLabel = [[UILabel alloc] init];
+    expTitleLabel.text = @"Expires";
+    expTitleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    expTitleLabel.textColor = [UIColor secondaryLabelColor];
+    expTitleLabel.textAlignment = NSTextAlignmentRight;
+    expTitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
+
+    UILabel *expDateLabel = [[UILabel alloc] init];
+    expDateLabel.text = expStr;
+    expDateLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightRegular];
+    if (@available(iOS 26.0, *)) {
+        expDateLabel.textColor = [UIColor labelColor];
+    } else {
+        expDateLabel.textColor = [UIColor cf_primaryTextColor];
+    }
+    expDateLabel.textAlignment = NSTextAlignmentRight;
+    expDateLabel.translatesAutoresizingMaskIntoConstraints = NO;
+
+    [container addSubview:regTitleLabel];
+    [container addSubview:regDateLabel];
+    [container addSubview:expTitleLabel];
+    [container addSubview:expDateLabel];
+
+    // Progress bar
+    UIView *trackView = [[UIView alloc] init];
+    trackView.translatesAutoresizingMaskIntoConstraints = NO;
+    trackView.backgroundColor = [[UIColor systemGrayColor] colorWithAlphaComponent:0.2];
+    trackView.layer.cornerRadius = 4;
+    trackView.clipsToBounds = YES;
+
+    UIView *fillView = [[UIView alloc] init];
+    fillView.translatesAutoresizingMaskIntoConstraints = NO;
+    fillView.backgroundColor = progressColor;
+    fillView.layer.cornerRadius = 4;
+
+    [trackView addSubview:fillView];
+    [container addSubview:trackView];
+
+    [NSLayoutConstraint activateConstraints:@[
+        // Registered title
+        [regTitleLabel.topAnchor constraintEqualToAnchor:container.topAnchor],
+        [regTitleLabel.leadingAnchor constraintEqualToAnchor:container.leadingAnchor],
+
+        // Registered date
+        [regDateLabel.topAnchor constraintEqualToAnchor:regTitleLabel.bottomAnchor constant:2],
+        [regDateLabel.leadingAnchor constraintEqualToAnchor:container.leadingAnchor],
+
+        // Expires title
+        [expTitleLabel.topAnchor constraintEqualToAnchor:container.topAnchor],
+        [expTitleLabel.trailingAnchor constraintEqualToAnchor:container.trailingAnchor],
+
+        // Expires date
+        [expDateLabel.topAnchor constraintEqualToAnchor:expTitleLabel.bottomAnchor constant:2],
+        [expDateLabel.trailingAnchor constraintEqualToAnchor:container.trailingAnchor],
+
+        // Progress bar track
+        [trackView.topAnchor constraintEqualToAnchor:regDateLabel.bottomAnchor constant:10],
+        [trackView.leadingAnchor constraintEqualToAnchor:container.leadingAnchor],
+        [trackView.trailingAnchor constraintEqualToAnchor:container.trailingAnchor],
+        [trackView.heightAnchor constraintEqualToConstant:8],
+        [trackView.bottomAnchor constraintEqualToAnchor:container.bottomAnchor],
+
+        // Progress bar fill
+        [fillView.topAnchor constraintEqualToAnchor:trackView.topAnchor],
+        [fillView.leadingAnchor constraintEqualToAnchor:trackView.leadingAnchor],
+        [fillView.bottomAnchor constraintEqualToAnchor:trackView.bottomAnchor],
+        [fillView.widthAnchor constraintEqualToAnchor:trackView.widthAnchor multiplier:progress]
+    ]];
+
+    return cell;
+}
+
 #pragma mark - UITableViewDelegate
 
 - (void)tableView:(UITableView *)tableView willDisplayCell:(UITableViewCell *)cell forRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -394,7 +587,7 @@
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
     
-    if (indexPath.section == 1) {
+    if (indexPath.section == 2) {
         if (indexPath.row == 0) {
             CFDNSRecordsViewController *dnsVC = [[CFDNSRecordsViewController alloc] initWithZone:self.zone];
             [self.navigationController pushViewController:dnsVC animated:YES];
@@ -402,13 +595,13 @@
             CFTrafficAnalyticsViewController *analyticsVC = [[CFTrafficAnalyticsViewController alloc] initWithZone:self.zone];
             [self.navigationController pushViewController:analyticsVC animated:YES];
         }
-    } else if (indexPath.section == 3) {
+    } else if (indexPath.section == 4) {
         if (indexPath.row == 0) {
             [self showSSLModePicker];
         } else {
             [self showSecurityLevelPicker];
         }
-    } else if (indexPath.section == 4 && indexPath.row == 1) {
+    } else if (indexPath.section == 5 && indexPath.row == 1) {
         [self purgeCacheTapped];
     }
 }
