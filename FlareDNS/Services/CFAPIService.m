@@ -576,8 +576,50 @@ static NSString *const kBaseURL = @"https://api.cloudflare.com/client/v4";
             completion(trafficData, nil);
         });
     }];
-    
+
     [task resume];
+}
+
+#pragma mark - Registrar
+
+- (void)fetchRegistrationForDomain:(NSString *)domainName accountID:(nullable NSString *)accountID completion:(void (^)(NSString * _Nullable, NSString * _Nullable, NSError * _Nullable))completion {
+    if (accountID.length == 0 || domainName.length == 0) {
+        NSError *error = [NSError errorWithDomain:@"CFAPIService"
+                                             code:-1
+                                         userInfo:@{NSLocalizedDescriptionKey: @"Missing account or domain"}];
+        completion(nil, nil, error);
+        return;
+    }
+
+    NSString *encodedDomain = [domainName stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLPathAllowedCharacterSet]];
+    NSString *path = [NSString stringWithFormat:@"/accounts/%@/registrar/domains/%@", accountID, encodedDomain];
+    NSMutableURLRequest *request = [self requestWithPath:path method:@"GET"];
+
+    // Domains registered outside Cloudflare return an API error here, which we surface as
+    // "no registration data" so the UI can mark them unsupported. The domain name is only ever
+    // sent to Cloudflare's own API, never to any third party.
+    [self performRequest:request completion:^(id _Nullable result, NSError * _Nullable error) {
+        if (error || ![result isKindOfClass:[NSDictionary class]]) {
+            completion(nil, nil, error ?: [NSError errorWithDomain:@"CFAPIService"
+                                                              code:-2
+                                                          userInfo:@{NSLocalizedDescriptionKey: @"No registration data"}]);
+            return;
+        }
+
+        NSDictionary *dict = (NSDictionary *)result;
+        NSString *registeredAt = [dict[@"created_at"] isKindOfClass:[NSString class]] ? dict[@"created_at"] : nil;
+        NSString *expiresAt = [dict[@"expires_at"] isKindOfClass:[NSString class]] ? dict[@"expires_at"] : nil;
+
+        if (registeredAt.length == 0 || expiresAt.length == 0) {
+            NSError *missingError = [NSError errorWithDomain:@"CFAPIService"
+                                                        code:-3
+                                                    userInfo:@{NSLocalizedDescriptionKey: @"Missing date information"}];
+            completion(nil, nil, missingError);
+            return;
+        }
+
+        completion(registeredAt, expiresAt, nil);
+    }];
 }
 
 @end

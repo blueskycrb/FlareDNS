@@ -47,6 +47,11 @@ typedef void (^CFAPICompletionBlock)(id _Nullable result, NSError * _Nullable er
 // Analytics
 - (void)fetchTrafficAnalyticsForZoneID:(NSString *)zoneID since:(NSDate *)since until:(NSDate *)until completion:(void (^)(CFTrafficData * _Nullable data, NSError * _Nullable error))completion;
 
+// Registrar
+// Returns registration/expiry dates for domains registered with Cloudflare Registrar.
+// Domains registered with another registrar are not covered by this endpoint and will return an error.
+- (void)fetchRegistrationForDomain:(NSString *)domainName accountID:(nullable NSString *)accountID completion:(void (^)(NSString * _Nullable registeredAt, NSString * _Nullable expiresAt, NSError * _Nullable error))completion;
+
 @end
 
 NS_ASSUME_NONNULL_END

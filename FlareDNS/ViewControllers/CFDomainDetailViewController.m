@@ -9,7 +9,6 @@
 #import "CFDNSRecordsViewController.h"
 #import "CFTrafficAnalyticsViewController.h"
 #import "CFAPIService.h"
-#import "CFDomainExpiryService.h"
 #import "UIColor+FlareDNS.h"
 
 @interface CFDomainDetailViewController () <UITableViewDelegate, UITableViewDataSource>
@@ -129,7 +128,9 @@
     }
 
     dispatch_group_enter(group);
-    [[CFDomainExpiryService shared] fetchExpiryForDomain:self.zone.name completion:^(NSString * _Nullable registeredAt, NSString * _Nullable expiresAt, NSError * _Nullable error) {
+    // Registration/expiry comes from Cloudflare's own Registrar API (only domains registered with
+    // Cloudflare Registrar are covered). The domain name is never sent to any third-party service.
+    [[CFAPIService shared] fetchRegistrationForDomain:self.zone.name accountID:self.zone.accountID completion:^(NSString * _Nullable registeredAt, NSString * _Nullable expiresAt, NSError * _Nullable error) {
         if (!error && registeredAt && expiresAt) {
             self.registeredAt = registeredAt;
             self.expiresAt = expiresAt;
@@ -448,6 +449,14 @@
         parser.dateFormat = @"yyyy-MM-dd";
         if (!regDate) regDate = [parser dateFromString:self.registeredAt];
         if (!expDate) expDate = [parser dateFromString:self.expiresAt];
+    }
+
+    // Fall back to ISO8601 (handles fractional seconds and timezone offsets, e.g. Cloudflare timestamps)
+    if (!regDate || !expDate) {
+        NSISO8601DateFormatter *iso = [[NSISO8601DateFormatter alloc] init];
+        iso.formatOptions = NSISO8601DateFormatWithInternetDateTime | NSISO8601DateFormatWithFractionalSeconds;
+        if (!regDate) regDate = [iso dateFromString:self.registeredAt];
+        if (!expDate) expDate = [iso dateFromString:self.expiresAt];
     }
 
     if (!regDate || !expDate) {
