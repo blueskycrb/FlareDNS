@@ -1,10 +1,10 @@
 # CFlareDNS
 
 [![iOS](https://img.shields.io/badge/iOS-16.0%2B-blue.svg)](https://developer.apple.com/ios/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: PolyForm NC](https://img.shields.io/badge/License-PolyForm_Noncommercial_1.0.0-red.svg)](https://polyformproject.org/licenses/noncommercial/1.0.0)
 [![Cloudflare](https://img.shields.io/badge/Cloudflare-API-orange.svg)](https://api.cloudflare.com/)
 [![App Store](https://img.shields.io/badge/App_Store-Coming_Soon-black?logo=apple)](https://apps.apple.com/app/id6758071138)
-[![TestFlight](https://img.shields.io/badge/TestFlight-Join_Beta-007AFF?logo=apple-testflight)](https://testflight.apple.com/join/3DtJwCzt)
+[![TestFlight](https://img.shields.io/badge/TestFlight-Coming_Soon-007AFF?logo=apple-testflight)](https://testflight.apple.com/join/3DtJwCzt)
 [![Sponsor](https://img.shields.io/badge/Sponsor-GitHub-EA4AAA?logo=github-sponsors)](https://github.com/sponsors/missuo)
 
 **CFlareDNS** is a lightweight, secure, and powerful iOS application designed for managing your Cloudflare domains and DNS records on the go. Built with native performance in mind, it provides a seamless experience for developers and system administrators to monitor and tweak their network settings anytime, anywhere.
@@ -81,7 +81,13 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📄 License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+Distributed under the **PolyForm Noncommercial License 1.0.0**. See `LICENSE` for the full text.
+
+**This is a source-available, _noncommercial_ license — it is not OSI "open source".** In short:
+
+- ✅ Free to use, study, modify, and share for **any noncommercial purpose** (personal projects, research, education, nonprofits, etc.).
+- ❌ **Commercial use is not permitted.** For a commercial license, contact the author.
+- 📌 If you redistribute or build derivative works, you **must keep this license and the `Required Notice:` line** (crediting the original author and repository).
 
 ---
 *Disclaimer: This app is not affiliated with, sponsored by, or endorsed by Cloudflare, Inc.*
