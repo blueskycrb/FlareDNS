@@ -81,13 +81,29 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📄 License
 
-Distributed under the **PolyForm Noncommercial License 1.0.0**. See `LICENSE` for the full text.
+Distributed under the **PolyForm Noncommercial License 1.0.0**. See [`LICENSE`](./LICENSE) for the full text.
 
-**This is a source-available, _noncommercial_ license — it is not OSI "open source".** In short:
+> **Note:** This is a **source-available, _noncommercial_** license. It is **not** an OSI-approved "open source" license, because it forbids commercial use.
 
-- ✅ Free to use, study, modify, and share for **any noncommercial purpose** (personal projects, research, education, nonprofits, etc.).
-- ❌ **Commercial use is not permitted.** For a commercial license, contact the author.
-- 📌 If you redistribute or build derivative works, you **must keep this license and the `Required Notice:` line** (crediting the original author and repository).
+### ✅ You are free to
+
+- **Use, study, and run** the app for **any noncommercial purpose** — personal projects, learning, research, education, nonprofits, and similar.
+- **Modify the source** and **build derivative works** for those same noncommercial purposes.
+- **Share** the app and your changes, as long as you follow the conditions below.
+
+### ❌ You may not
+
+- **Use it commercially** in any form — including selling it, bundling it into a paid product or service, running it as part of a business, or any other use intended for commercial advantage or monetary compensation.
+  *(Need a commercial license? Open an issue or contact the author.)*
+
+### 📌 If you fork or build on it, you must
+
+1. **Keep the license.** Ship the full `LICENSE` text and the `Required Notice:` line with every copy, changed or not.
+2. **Credit the original — one of these is required:**
+   - **Keep the original name** (`FlareDNS`); **or**
+   - If you rename it, **clearly credit the original author (Vincent Yang) and link back to the original repository** (`https://github.com/missuo/FlareDNS`) in your README and/or About screen.
+
+In other words: you can fork it and even rename it, but you can **never** strip the attribution, and you can **never** use it for commercial purposes.
 
 ---
 *Disclaimer: This app is not affiliated with, sponsored by, or endorsed by Cloudflare, Inc.*
