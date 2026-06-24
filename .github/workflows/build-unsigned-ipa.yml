@@ -6,6 +6,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build unsigned IPA
@@ -72,12 +75,30 @@ jobs:
           cp -R "$APP_PATH" "$PWD/build/Payload/"
           ditto -c -k --sequesterRsrc --keepParent "$PWD/build/Payload" "$PWD/build/ipa/FlareDNS-unsigned.ipa"
 
-      - name: Upload unsigned IPA
+      - name: Upload unsigned IPA artifact
         uses: actions/upload-artifact@v4
         with:
           name: FlareDNS-unsigned-ipa
           path: build/ipa/FlareDNS-unsigned.ipa
           if-no-files-found: error
+
+      - name: Publish unsigned IPA release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          TAG="unsigned-latest"
+          IPA_PATH="$PWD/build/ipa/FlareDNS-unsigned.ipa"
+
+          gh release delete "$TAG" --yes --cleanup-tag || true
+          git tag -f "$TAG" "$GITHUB_SHA"
+          git push --force origin "refs/tags/$TAG"
+          gh release create "$TAG" \
+            "$IPA_PATH#FlareDNS-unsigned.ipa" \
+            --title "Latest unsigned IPA" \
+            --notes "Unsigned IPA for TrollStore. Download the .ipa asset directly; do not rename the Actions artifact zip." \
+            --latest=false
 
       - name: Upload build diagnostics
         if: always()
@@ -86,4 +107,3 @@ jobs:
           name: FlareDNS-build-diagnostics
           path: build/diagnostics
           if-no-files-found: ignore
-
