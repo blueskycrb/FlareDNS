@@ -26,44 +26,49 @@ jobs:
           xcodebuild -version
           xcrun --sdk iphoneos --show-sdk-version
 
-      - name: Build app without signing
+      - name: Build and package unsigned IPA
         run: |
           set -e
-          BUILD_DIR="$PWD/build/Release-iphoneos"
-          rm -rf "$BUILD_DIR"
-          mkdir -p "$BUILD_DIR"
+          mkdir -p "$PWD/build/diagnostics" "$PWD/build/ipa"
 
-          xcodebuild \
-            -project FlareDNS.xcodeproj \
-            -scheme FlareDNS \
-            -configuration Release \
-            -sdk iphoneos \
-            -destination 'generic/platform=iOS' \
-            -derivedDataPath "$PWD/build/DerivedData" \
-            CONFIGURATION_BUILD_DIR="$BUILD_DIR" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            DEVELOPMENT_TEAM="" \
-            build
+          COMMON_ARGS=(
+            -project FlareDNS.xcodeproj
+            -scheme FlareDNS
+            -configuration Release
+            -sdk iphoneos
+            -destination 'generic/platform=iOS'
+            -derivedDataPath "$PWD/build/DerivedData"
+            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_REQUIRED=NO
+            CODE_SIGN_IDENTITY=
+            DEVELOPMENT_TEAM=
+          )
 
-          echo "Build output:"
-          find "$BUILD_DIR" -maxdepth 2 -print
+          xcodebuild "${COMMON_ARGS[@]}" build
 
-      - name: Package unsigned IPA
-        run: |
-          set -e
-          APP_PATH="$PWD/build/Release-iphoneos/FlareDNS.app"
+          xcodebuild "${COMMON_ARGS[@]}" -showBuildSettings > "$PWD/build/diagnostics/build-settings.txt"
+          TARGET_BUILD_DIR=$(awk -F' = ' '/ TARGET_BUILD_DIR = / { value=$2 } END { print value }' "$PWD/build/diagnostics/build-settings.txt")
+          WRAPPER_NAME=$(awk -F' = ' '/ WRAPPER_NAME = / { value=$2 } END { print value }' "$PWD/build/diagnostics/build-settings.txt")
+          APP_PATH="$TARGET_BUILD_DIR/$WRAPPER_NAME"
+
+          echo "TARGET_BUILD_DIR=$TARGET_BUILD_DIR"
+          echo "WRAPPER_NAME=$WRAPPER_NAME"
+          echo "APP_PATH=$APP_PATH"
+          find "$PWD/build" -maxdepth 8 -type d -name '*.app' -print > "$PWD/build/diagnostics/app-bundles.txt" || true
+
           if [ ! -d "$APP_PATH" ]; then
-            echo "Expected app bundle not found at $APP_PATH"
-            echo "Build directory contents:"
-            find "$PWD/build" -maxdepth 5 -print || true
+            APP_PATH=$(sed -n '1p' "$PWD/build/diagnostics/app-bundles.txt")
+          fi
+
+          if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
+            echo "No .app bundle found. Known app bundles:"
+            cat "$PWD/build/diagnostics/app-bundles.txt"
             exit 1
           fi
 
           echo "Packaging $APP_PATH"
-          rm -rf "$PWD/build/Payload" "$PWD/build/ipa"
-          mkdir -p "$PWD/build/Payload" "$PWD/build/ipa"
+          rm -rf "$PWD/build/Payload"
+          mkdir -p "$PWD/build/Payload"
           cp -R "$APP_PATH" "$PWD/build/Payload/"
           (cd "$PWD/build" && zip -qry "$PWD/build/ipa/FlareDNS-unsigned.ipa" Payload)
 
@@ -73,3 +78,11 @@ jobs:
           name: FlareDNS-unsigned-ipa
           path: build/ipa/FlareDNS-unsigned.ipa
           if-no-files-found: error
+
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FlareDNS-build-diagnostics
+          path: build/diagnostics
+          if-no-files-found: ignore
