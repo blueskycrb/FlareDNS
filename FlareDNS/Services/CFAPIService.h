@@ -9,6 +9,10 @@
 #import "CFZone.h"
 #import "CFDNSRecord.h"
 #import "CFTrafficData.h"
+#import "CFAccount.h"
+#import "CFWorkerScript.h"
+#import "CFWorkerRoute.h"
+#import "CFKVNamespace.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -18,10 +22,12 @@ typedef void (^CFAPICompletionBlock)(id _Nullable result, NSError * _Nullable er
 
 @property (nonatomic, copy, nullable) NSString *email;
 @property (nonatomic, copy, nullable) NSString *apiKey;
+@property (nonatomic, assign) BOOL usesAPIToken;
 
 + (instancetype)shared;
 
 // Authentication
+- (void)configureWithAccount:(CFAccount *)account;
 - (void)verifyCredentialsWithCompletion:(void (^)(BOOL success, NSError * _Nullable error))completion;
 
 // Zones
@@ -43,6 +49,23 @@ typedef void (^CFAPICompletionBlock)(id _Nullable result, NSError * _Nullable er
 - (void)fetchDevelopmentModeForZoneID:(NSString *)zoneID completion:(void (^)(BOOL enabled, NSError * _Nullable error))completion;
 - (void)setDevelopmentMode:(BOOL)enabled forZoneID:(NSString *)zoneID completion:(void (^)(BOOL success, NSError * _Nullable error))completion;
 - (void)purgeCacheForZoneID:(NSString *)zoneID completion:(void (^)(BOOL success, NSError * _Nullable error))completion;
+- (void)purgeCacheForZoneID:(NSString *)zoneID files:(NSArray<NSString *> *)files completion:(void (^)(BOOL success, NSError * _Nullable error))completion;
+- (void)fetchBrotliForZoneID:(NSString *)zoneID completion:(void (^)(BOOL enabled, NSError * _Nullable error))completion;
+- (void)setBrotli:(BOOL)enabled forZoneID:(NSString *)zoneID completion:(void (^)(BOOL success, NSError * _Nullable error))completion;
+- (void)fetchAlwaysOnlineForZoneID:(NSString *)zoneID completion:(void (^)(BOOL enabled, NSError * _Nullable error))completion;
+- (void)setAlwaysOnline:(BOOL)enabled forZoneID:(NSString *)zoneID completion:(void (^)(BOOL success, NSError * _Nullable error))completion;
+- (void)fetchCacheLevelForZoneID:(NSString *)zoneID completion:(void (^)(NSString * _Nullable value, NSError * _Nullable error))completion;
+- (void)setCacheLevel:(NSString *)value forZoneID:(NSString *)zoneID completion:(void (^)(BOOL success, NSError * _Nullable error))completion;
+- (void)fetchBrowserCacheTTLForZoneID:(NSString *)zoneID completion:(void (^)(NSInteger seconds, NSError * _Nullable error))completion;
+- (void)setBrowserCacheTTL:(NSInteger)seconds forZoneID:(NSString *)zoneID completion:(void (^)(BOOL success, NSError * _Nullable error))completion;
+
+// Workers
+- (void)fetchWorkerScriptsForAccountID:(NSString *)accountID completion:(void (^)(NSArray<CFWorkerScript *> * _Nullable scripts, NSError * _Nullable error))completion;
+- (void)fetchWorkerRoutesForZoneID:(NSString *)zoneID completion:(void (^)(NSArray<CFWorkerRoute *> * _Nullable routes, NSError * _Nullable error))completion;
+- (void)createWorkerRouteForZoneID:(NSString *)zoneID pattern:(NSString *)pattern scriptName:(NSString *)scriptName completion:(void (^)(CFWorkerRoute * _Nullable route, NSError * _Nullable error))completion;
+- (void)deleteWorkerRouteWithID:(NSString *)routeID forZoneID:(NSString *)zoneID completion:(void (^)(BOOL success, NSError * _Nullable error))completion;
+- (void)fetchKVNamespacesForAccountID:(NSString *)accountID completion:(void (^)(NSArray<CFKVNamespace *> * _Nullable namespaces, NSError * _Nullable error))completion;
+- (void)fetchKVKeysForAccountID:(NSString *)accountID namespaceID:(NSString *)namespaceID completion:(void (^)(NSArray<NSString *> * _Nullable keys, NSError * _Nullable error))completion;
 
 // Analytics
 - (void)fetchTrafficAnalyticsForZoneID:(NSString *)zoneID since:(NSDate *)since until:(NSDate *)until completion:(void (^)(CFTrafficData * _Nullable data, NSError * _Nullable error))completion;
