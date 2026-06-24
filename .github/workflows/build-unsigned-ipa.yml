@@ -70,7 +70,7 @@ jobs:
           rm -rf "$PWD/build/Payload"
           mkdir -p "$PWD/build/Payload"
           cp -R "$APP_PATH" "$PWD/build/Payload/"
-          (cd "$PWD/build" && zip -qry "$PWD/build/ipa/FlareDNS-unsigned.ipa" Payload)
+          ditto -c -k --sequesterRsrc --keepParent "$PWD/build/Payload" "$PWD/build/ipa/FlareDNS-unsigned.ipa"
 
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
@@ -86,3 +86,4 @@ jobs:
           name: FlareDNS-build-diagnostics
           path: build/diagnostics
           if-no-files-found: ignore
+
