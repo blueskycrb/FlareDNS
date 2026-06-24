@@ -29,6 +29,10 @@ jobs:
       - name: Build app without signing
         run: |
           set -e
+          BUILD_DIR="$PWD/build/Release-iphoneos"
+          rm -rf "$BUILD_DIR"
+          mkdir -p "$BUILD_DIR"
+
           xcodebuild \
             -project FlareDNS.xcodeproj \
             -scheme FlareDNS \
@@ -36,25 +40,24 @@ jobs:
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -derivedDataPath "$PWD/build/DerivedData" \
+            CONFIGURATION_BUILD_DIR="$BUILD_DIR" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="" \
             build
 
+          echo "Build output:"
+          find "$BUILD_DIR" -maxdepth 2 -print
+
       - name: Package unsigned IPA
         run: |
           set -e
-          APP_LIST="$RUNNER_TEMP/app-bundles.txt"
-          find "$PWD/build/DerivedData" -type d -name '*.app' -print > "$APP_LIST" || true
-
-          echo "Available app bundles:"
-          cat "$APP_LIST"
-
-          APP_PATH=$(sed -n '1p' "$APP_LIST")
-          if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
-            echo "No .app bundle found. Build products:"
-            find "$PWD/build/DerivedData/Build/Products" -maxdepth 5 -print || true
+          APP_PATH="$PWD/build/Release-iphoneos/FlareDNS.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "Expected app bundle not found at $APP_PATH"
+            echo "Build directory contents:"
+            find "$PWD/build" -maxdepth 5 -print || true
             exit 1
           fi
 
