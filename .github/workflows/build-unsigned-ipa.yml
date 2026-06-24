@@ -1,0 +1,65 @@
+name: Build unsigned IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build unsigned IPA
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select latest Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Show Xcode version
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - name: Build app without signing
+        run: |
+          set -eo pipefail
+          xcodebuild \
+            -project FlareDNS.xcodeproj \
+            -scheme FlareDNS \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$PWD/build/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            build
+
+      - name: Package unsigned IPA
+        run: |
+          set -eo pipefail
+          APP_PATH=$(find "$PWD/build/DerivedData/Build/Products/Release-iphoneos" -maxdepth 1 -type d -name '*.app' | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "No .app bundle found. Build products:"
+            find "$PWD/build/DerivedData/Build/Products" -maxdepth 3 -print || true
+            exit 1
+          fi
+
+          rm -rf "$PWD/build/Payload" "$PWD/build/ipa"
+          mkdir -p "$PWD/build/Payload" "$PWD/build/ipa"
+          cp -R "$APP_PATH" "$PWD/build/Payload/"
+          (cd "$PWD/build" && zip -qry "$PWD/build/ipa/FlareDNS-unsigned.ipa" Payload)
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: FlareDNS-unsigned-ipa
+          path: build/ipa/FlareDNS-unsigned.ipa
+          if-no-files-found: error
