@@ -45,13 +45,17 @@ jobs:
       - name: Package unsigned IPA
         run: |
           set -eo pipefail
-          APP_PATH=$(find "$PWD/build/DerivedData/Build/Products/Release-iphoneos" -maxdepth 1 -type d -name '*.app' | head -n 1)
+          echo "Available app bundles:"
+          find "$PWD/build/DerivedData" -type d -name '*.app' -print || true
+
+          APP_PATH=$(find "$PWD/build/DerivedData" -type d -name '*.app' -path '*/Build/Products/*' -print | head -n 1)
           if [ -z "$APP_PATH" ]; then
             echo "No .app bundle found. Build products:"
-            find "$PWD/build/DerivedData/Build/Products" -maxdepth 3 -print || true
+            find "$PWD/build/DerivedData/Build/Products" -maxdepth 4 -print || true
             exit 1
           fi
 
+          echo "Packaging $APP_PATH"
           rm -rf "$PWD/build/Payload" "$PWD/build/ipa"
           mkdir -p "$PWD/build/Payload" "$PWD/build/ipa"
           cp -R "$APP_PATH" "$PWD/build/Payload/"
