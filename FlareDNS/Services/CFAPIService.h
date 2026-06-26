@@ -13,6 +13,7 @@
 #import "CFWorkerScript.h"
 #import "CFWorkerRoute.h"
 #import "CFKVNamespace.h"
+#import "CFRulesetRule.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -59,6 +60,12 @@ typedef void (^CFAPICompletionBlock)(id _Nullable result, NSError * _Nullable er
 - (void)fetchBrowserCacheTTLForZoneID:(NSString *)zoneID completion:(void (^)(NSInteger seconds, NSError * _Nullable error))completion;
 - (void)setBrowserCacheTTL:(NSInteger)seconds forZoneID:(NSString *)zoneID completion:(void (^)(BOOL success, NSError * _Nullable error))completion;
 
+
+// Rulesets
+- (void)fetchRulesForZoneID:(NSString *)zoneID phase:(CFRulesetPhase)phase completion:(void (^)(NSArray<CFRulesetRule *> * _Nullable rules, NSError * _Nullable error))completion;
+- (void)createRedirectRuleForZoneID:(NSString *)zoneID description:(NSString *)description expression:(NSString *)expression targetURL:(NSString *)targetURL statusCode:(NSInteger)statusCode preserveQueryString:(BOOL)preserveQueryString completion:(void (^)(CFRulesetRule * _Nullable rule, NSError * _Nullable error))completion;
+- (void)setRuleEnabled:(BOOL)enabled ruleID:(NSString *)ruleID forZoneID:(NSString *)zoneID phase:(CFRulesetPhase)phase completion:(void (^)(BOOL success, NSError * _Nullable error))completion;
+- (void)deleteRuleWithID:(NSString *)ruleID forZoneID:(NSString *)zoneID phase:(CFRulesetPhase)phase completion:(void (^)(BOOL success, NSError * _Nullable error))completion;
 // Workers
 - (void)fetchWorkerScriptsForAccountID:(NSString *)accountID completion:(void (^)(NSArray<CFWorkerScript *> * _Nullable scripts, NSError * _Nullable error))completion;
 - (void)fetchWorkerRoutesForZoneID:(NSString *)zoneID completion:(void (^)(NSArray<CFWorkerRoute *> * _Nullable routes, NSError * _Nullable error))completion;

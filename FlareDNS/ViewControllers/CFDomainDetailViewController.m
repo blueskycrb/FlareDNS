@@ -9,6 +9,7 @@
 #import "CFDNSRecordsViewController.h"
 #import "CFTrafficAnalyticsViewController.h"
 #import "CFWorkersViewController.h"
+#import "CFRulesViewController.h"
 #import "CFAPIService.h"
 #import "UIColor+FlareDNS.h"
 
@@ -225,7 +226,7 @@
     switch (section) {
         case 0: return 1; // Domain Information (Status)
         case 1: return 1; // Domain Registration
-        case 2: return 3; // Zone Details (DNS Records, Traffic Analytics, Workers)
+        case 2: return 4; // Zone Details (DNS Records, Traffic Analytics, Rules, Workers)
         case 3: return self.zone.nameServers.count; // Nameservers
         case 4: return 2; // Security (SSL Mode, Security Level)
         case 5: return 4; // Performance (Brotli, Always Online, Cache Level, Browser TTL)
@@ -358,6 +359,12 @@
         cell.textLabel.text = @"Traffic Analytics";
         customImageView.image = [self iconWithName:@"chart.bar.fill"];
         customImageView.tintColor = [UIColor systemGreenColor];
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+    } else if (row == 2) {
+        cell.textLabel.text = @"Rules";
+        customImageView.image = [self iconWithName:@"slider.horizontal.3"];
+        customImageView.tintColor = [UIColor systemOrangeColor];
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         cell.selectionStyle = UITableViewCellSelectionStyleDefault;
     } else {
@@ -765,6 +772,9 @@
         } else if (indexPath.row == 1) {
             CFTrafficAnalyticsViewController *analyticsVC = [[CFTrafficAnalyticsViewController alloc] initWithZone:self.zone];
             [self.navigationController pushViewController:analyticsVC animated:YES];
+        } else if (indexPath.row == 2) {
+            CFRulesViewController *rulesVC = [[CFRulesViewController alloc] initWithZone:self.zone];
+            [self.navigationController pushViewController:rulesVC animated:YES];
         } else {
             CFWorkersViewController *workersVC = [[CFWorkersViewController alloc] initWithZone:self.zone];
             [self.navigationController pushViewController:workersVC animated:YES];

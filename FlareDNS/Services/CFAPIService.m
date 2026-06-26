@@ -465,6 +465,200 @@ static NSString *const kBaseURL = @"https://api.cloudflare.com/client/v4";
     [self setZoneSetting:@"browser_cache_ttl" value:@(seconds) forZoneID:zoneID completion:completion];
 }
 
+
+#pragma mark - Rulesets
+
+- (void)fetchRulesForZoneID:(NSString *)zoneID phase:(CFRulesetPhase)phase completion:(void (^)(NSArray<CFRulesetRule *> * _Nullable, NSError * _Nullable))completion {
+    NSString *phaseName = [CFRulesetRule apiPhaseFromPhase:phase];
+    NSString *path = [NSString stringWithFormat:@"/zones/%@/rulesets/phases/%@/entrypoint", zoneID, phaseName];
+    NSMutableURLRequest *request = [self requestWithPath:path method:@"GET"];
+
+    [self performRequest:request completion:^(id result, NSError *error) {
+        if (error) {
+            if (error.code == 404) {
+                completion(@[], nil);
+            } else {
+                completion(nil, error);
+            }
+            return;
+        }
+
+        NSArray *items = [result isKindOfClass:[NSDictionary class]] && [result[@"rules"] isKindOfClass:[NSArray class]] ? result[@"rules"] : @[];
+        NSMutableArray<CFRulesetRule *> *rules = [NSMutableArray array];
+        for (NSDictionary *dict in items) {
+            if ([dict isKindOfClass:[NSDictionary class]]) {
+                [rules addObject:[CFRulesetRule ruleFromDictionary:dict phase:phase]];
+            }
+        }
+        completion(rules, nil);
+    }];
+}
+
+- (void)createRedirectRuleForZoneID:(NSString *)zoneID description:(NSString *)description expression:(NSString *)expression targetURL:(NSString *)targetURL statusCode:(NSInteger)statusCode preserveQueryString:(BOOL)preserveQueryString completion:(void (^)(CFRulesetRule * _Nullable, NSError * _Nullable))completion {
+    CFRulesetPhase phase = CFRulesetPhaseDynamicRedirect;
+    NSDictionary *ruleBody = [self redirectRuleBodyWithDescription:description expression:expression targetURL:targetURL statusCode:statusCode preserveQueryString:preserveQueryString];
+    [self createRule:ruleBody forZoneID:zoneID phase:phase completion:^(CFRulesetRule * _Nullable rule, NSError * _Nullable error) {
+        if (error && error.code == 404) {
+            [self createEntrypointRulesetForZoneID:zoneID phase:phase firstRuleBody:ruleBody completion:completion];
+        } else {
+            completion(rule, error);
+        }
+    }];
+}
+
+- (NSDictionary *)redirectRuleBodyWithDescription:(NSString *)description expression:(NSString *)expression targetURL:(NSString *)targetURL statusCode:(NSInteger)statusCode preserveQueryString:(BOOL)preserveQueryString {
+    return @{
+        @"description": description.length > 0 ? description : @"Redirect rule",
+        @"expression": expression,
+        @"action": @"redirect",
+        @"enabled": @YES,
+        @"action_parameters": @{
+            @"from_value": @{
+                @"status_code": @(statusCode),
+                @"target_url": @{@"value": targetURL},
+                @"preserve_query_string": @(preserveQueryString)
+            }
+        }
+    };
+}
+
+- (void)createRule:(NSDictionary *)ruleBody forZoneID:(NSString *)zoneID phase:(CFRulesetPhase)phase completion:(void (^)(CFRulesetRule * _Nullable rule, NSError * _Nullable error))completion {
+    NSString *phaseName = [CFRulesetRule apiPhaseFromPhase:phase];
+    NSString *path = [NSString stringWithFormat:@"/zones/%@/rulesets/phases/%@/entrypoint/rules", zoneID, phaseName];
+    NSMutableURLRequest *request = [self requestWithPath:path method:@"POST"];
+
+    NSError *jsonError;
+    request.HTTPBody = [NSJSONSerialization dataWithJSONObject:ruleBody options:0 error:&jsonError];
+    if (jsonError) {
+        completion(nil, jsonError);
+        return;
+    }
+
+    [self performRequest:request completion:^(id result, NSError *error) {
+        if (error) {
+            completion(nil, error);
+            return;
+        }
+        NSDictionary *createdRule = [self firstRuleDictionaryFromRulesetResult:result fallbackRuleID:nil];
+        completion([CFRulesetRule ruleFromDictionary:(createdRule ?: result) phase:phase], nil);
+    }];
+}
+
+- (void)createEntrypointRulesetForZoneID:(NSString *)zoneID phase:(CFRulesetPhase)phase firstRuleBody:(NSDictionary *)ruleBody completion:(void (^)(CFRulesetRule * _Nullable rule, NSError * _Nullable error))completion {
+    NSString *phaseName = [CFRulesetRule apiPhaseFromPhase:phase];
+    NSString *path = [NSString stringWithFormat:@"/zones/%@/rulesets/phases/%@/entrypoint", zoneID, phaseName];
+    NSMutableURLRequest *request = [self requestWithPath:path method:@"PUT"];
+    NSDictionary *body = @{
+        @"description": [NSString stringWithFormat:@"%@ entrypoint", [CFRulesetRule displayNameForPhase:phase]],
+        @"rules": @[ruleBody]
+    };
+
+    NSError *jsonError;
+    request.HTTPBody = [NSJSONSerialization dataWithJSONObject:body options:0 error:&jsonError];
+    if (jsonError) {
+        completion(nil, jsonError);
+        return;
+    }
+
+    [self performRequest:request completion:^(id result, NSError *error) {
+        if (error) {
+            completion(nil, error);
+            return;
+        }
+        NSDictionary *created = [self firstRuleDictionaryFromRulesetResult:result fallbackRuleID:nil];
+        completion(created ? [CFRulesetRule ruleFromDictionary:created phase:phase] : nil, nil);
+    }];
+}
+
+- (NSDictionary *)firstRuleDictionaryFromRulesetResult:(id)result fallbackRuleID:(nullable NSString *)ruleID {
+    if (![result isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+
+    NSDictionary *dict = (NSDictionary *)result;
+    if ([dict[@"action"] isKindOfClass:[NSString class]] && [dict[@"expression"] isKindOfClass:[NSString class]]) {
+        return dict;
+    }
+
+    NSArray *rules = [dict[@"rules"] isKindOfClass:[NSArray class]] ? dict[@"rules"] : @[];
+    for (NSDictionary *rule in rules) {
+        if (![rule isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        if (ruleID.length == 0 || [rule[@"id"] isEqualToString:ruleID]) {
+            return rule;
+        }
+    }
+
+    return nil;
+}
+
+- (void)setRuleEnabled:(BOOL)enabled ruleID:(NSString *)ruleID forZoneID:(NSString *)zoneID phase:(CFRulesetPhase)phase completion:(void (^)(BOOL, NSError * _Nullable))completion {
+    NSString *phaseName = [CFRulesetRule apiPhaseFromPhase:phase];
+    NSString *path = [NSString stringWithFormat:@"/zones/%@/rulesets/phases/%@/entrypoint", zoneID, phaseName];
+    NSMutableURLRequest *request = [self requestWithPath:path method:@"GET"];
+
+    [self performRequest:request completion:^(id result, NSError *error) {
+        if (error) {
+            completion(NO, error);
+            return;
+        }
+
+        NSArray *rules = [result isKindOfClass:[NSDictionary class]] && [result[@"rules"] isKindOfClass:[NSArray class]] ? result[@"rules"] : @[];
+        NSDictionary *target = nil;
+        for (NSDictionary *rule in rules) {
+            if ([rule isKindOfClass:[NSDictionary class]] && [rule[@"id"] isEqualToString:ruleID]) {
+                target = rule;
+                break;
+            }
+        }
+
+        if (!target) {
+            NSError *notFound = [NSError errorWithDomain:@"CFAPIService" code:404 userInfo:@{NSLocalizedDescriptionKey: @"Rule not found"}];
+            completion(NO, notFound);
+            return;
+        }
+
+        NSMutableDictionary *changes = [NSMutableDictionary dictionary];
+        NSArray<NSString *> *allowedKeys = @[@"action", @"action_parameters", @"description", @"enabled", @"expression", @"logging", @"ratelimit"];
+        for (NSString *key in allowedKeys) {
+            id value = target[key];
+            if (value && value != [NSNull null]) {
+                changes[key] = value;
+            }
+        }
+        changes[@"enabled"] = @(enabled);
+        [self updateRuleWithID:ruleID forZoneID:zoneID phase:phase changes:changes completion:completion];
+    }];
+}
+
+- (void)deleteRuleWithID:(NSString *)ruleID forZoneID:(NSString *)zoneID phase:(CFRulesetPhase)phase completion:(void (^)(BOOL, NSError * _Nullable))completion {
+    NSString *phaseName = [CFRulesetRule apiPhaseFromPhase:phase];
+    NSString *path = [NSString stringWithFormat:@"/zones/%@/rulesets/phases/%@/entrypoint/rules/%@", zoneID, phaseName, ruleID];
+    NSMutableURLRequest *request = [self requestWithPath:path method:@"DELETE"];
+
+    [self performRequest:request completion:^(id result, NSError *error) {
+        completion(error == nil, error);
+    }];
+}
+
+- (void)updateRuleWithID:(NSString *)ruleID forZoneID:(NSString *)zoneID phase:(CFRulesetPhase)phase changes:(NSDictionary *)changes completion:(void (^)(BOOL success, NSError * _Nullable error))completion {
+    NSString *phaseName = [CFRulesetRule apiPhaseFromPhase:phase];
+    NSString *path = [NSString stringWithFormat:@"/zones/%@/rulesets/phases/%@/entrypoint/rules/%@", zoneID, phaseName, ruleID];
+    NSMutableURLRequest *request = [self requestWithPath:path method:@"PATCH"];
+
+    NSError *jsonError;
+    request.HTTPBody = [NSJSONSerialization dataWithJSONObject:changes options:0 error:&jsonError];
+    if (jsonError) {
+        completion(NO, jsonError);
+        return;
+    }
+
+    [self performRequest:request completion:^(id result, NSError *error) {
+        completion(error == nil, error);
+    }];
+}
+
 #pragma mark - Workers
 
 - (void)fetchWorkerScriptsForAccountID:(NSString *)accountID completion:(void (^)(NSArray<CFWorkerScript *> * _Nullable, NSError * _Nullable))completion {
