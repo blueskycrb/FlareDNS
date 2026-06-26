@@ -711,6 +711,52 @@ static NSString *const kBaseURL = @"https://api.cloudflare.com/client/v4";
     }];
 }
 
+
+- (void)fetchWorkerScriptContentForAccountID:(NSString *)accountID scriptName:(NSString *)scriptName completion:(void (^)(NSString * _Nullable, NSError * _Nullable))completion {
+    NSString *encodedScript = [scriptName stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLPathAllowedCharacterSet]];
+    NSString *path = [NSString stringWithFormat:@"/accounts/%@/workers/scripts/%@", accountID, encodedScript ?: scriptName];
+    NSMutableURLRequest *request = [self requestWithPath:path method:@"GET"];
+    [request setValue:@"application/javascript" forHTTPHeaderField:@"Accept"];
+
+    NSURLSessionDataTask *task = [self.session dataTaskWithRequest:request completionHandler:^(NSData * _Nullable data, NSURLResponse * _Nullable response, NSError * _Nullable error) {
+        if (error) {
+            dispatch_async(dispatch_get_main_queue(), ^{ completion(nil, error); });
+            return;
+        }
+
+        NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
+        NSString *contentType = httpResponse.allHeaderFields[@"Content-Type"] ?: @"";
+        NSString *body = data.length > 0 ? [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] : @"";
+
+        if (httpResponse.statusCode < 200 || httpResponse.statusCode >= 300) {
+            NSString *message = body.length > 0 ? body : @"Unable to fetch Worker script.";
+            NSError *apiError = [NSError errorWithDomain:@"CFAPIService" code:httpResponse.statusCode userInfo:@{NSLocalizedDescriptionKey: message}];
+            dispatch_async(dispatch_get_main_queue(), ^{ completion(nil, apiError); });
+            return;
+        }
+
+        if ([contentType rangeOfString:@"multipart" options:NSCaseInsensitiveSearch].location != NSNotFound) {
+            NSError *multipartError = [NSError errorWithDomain:@"CFAPIService" code:-20 userInfo:@{NSLocalizedDescriptionKey: @"This Worker uses a module upload format. Open it in Cloudflare Dashboard for full editing."}];
+            dispatch_async(dispatch_get_main_queue(), ^{ completion(nil, multipartError); });
+            return;
+        }
+
+        dispatch_async(dispatch_get_main_queue(), ^{ completion(body ?: @"", nil); });
+    }];
+    [task resume];
+}
+
+- (void)updateWorkerScriptContentForAccountID:(NSString *)accountID scriptName:(NSString *)scriptName content:(NSString *)content completion:(void (^)(BOOL, NSError * _Nullable))completion {
+    NSString *encodedScript = [scriptName stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLPathAllowedCharacterSet]];
+    NSString *path = [NSString stringWithFormat:@"/accounts/%@/workers/scripts/%@", accountID, encodedScript ?: scriptName];
+    NSMutableURLRequest *request = [self requestWithPath:path method:@"PUT"];
+    [request setValue:@"application/javascript" forHTTPHeaderField:@"Content-Type"];
+    request.HTTPBody = [content dataUsingEncoding:NSUTF8StringEncoding];
+
+    [self performRequest:request completion:^(id result, NSError *error) {
+        completion(error == nil, error);
+    }];
+}
 - (void)createWorkerRouteForZoneID:(NSString *)zoneID pattern:(NSString *)pattern scriptName:(NSString *)scriptName completion:(void (^)(CFWorkerRoute * _Nullable, NSError * _Nullable))completion {
     NSString *path = [NSString stringWithFormat:@"/zones/%@/workers/routes", zoneID];
     NSMutableURLRequest *request = [self requestWithPath:path method:@"POST"];

@@ -5,6 +5,7 @@
 
 #import "CFWorkersViewController.h"
 #import "CFAPIService.h"
+#import "CFWorkerScriptEditorViewController.h"
 #import "UIColor+FlareDNS.h"
 
 typedef NS_ENUM(NSInteger, CFWorkersSection) {
@@ -150,8 +151,11 @@ typedef NS_ENUM(NSInteger, CFWorkersSection) {
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
+    if (section == CFWorkersSectionScripts) {
+        return @"Tap a script to edit code, bind a route, or open it in Cloudflare Dashboard.";
+    }
     if (section == CFWorkersSectionRoutes) {
-        return @"Routes bind URL patterns on this zone to Worker scripts.";
+        return @"Routes bind URL patterns on this zone to Worker scripts. Tap a route to open it.";
     }
     if (section == CFWorkersSectionKV) {
         return @"Tap a namespace to preview up to 100 keys.";
@@ -181,13 +185,15 @@ typedef NS_ENUM(NSInteger, CFWorkersSection) {
         }
         CFWorkerScript *script = self.scripts[indexPath.row];
         cell.textLabel.text = script.name;
-        cell.detailTextLabel.text = script.modifiedOn.length > 0 ? [NSString stringWithFormat:@"Modified %@", script.modifiedOn] : @"Worker script";
+        cell.detailTextLabel.text = script.modifiedOn.length > 0 ? [NSString stringWithFormat:@"Modified %@", script.modifiedOn] : @"Tap to manage script";
         cell.imageView.image = [UIImage systemImageNamed:@"bolt.fill"];
         cell.imageView.tintColor = [UIColor systemOrangeColor];
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        cell.selectionStyle = UITableViewCellSelectionStyleDefault;
     } else if (indexPath.section == CFWorkersSectionRoutes) {
         if (self.routes.count == 0) {
             cell.textLabel.text = @"No routes";
-            cell.detailTextLabel.text = @"Use + to bind a pattern to a Worker.";
+            cell.detailTextLabel.text = @"Use + or tap a script to bind a pattern.";
             return cell;
         }
         CFWorkerRoute *route = self.routes[indexPath.row];
@@ -195,6 +201,8 @@ typedef NS_ENUM(NSInteger, CFWorkersSection) {
         cell.detailTextLabel.text = route.scriptName.length > 0 ? route.scriptName : @"No script";
         cell.imageView.image = [UIImage systemImageNamed:@"point.3.connected.trianglepath.dotted"];
         cell.imageView.tintColor = [UIColor systemBlueColor];
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        cell.selectionStyle = UITableViewCellSelectionStyleDefault;
     } else {
         if (self.namespaces.count == 0) {
             cell.textLabel.text = @"No KV namespaces";
@@ -217,7 +225,11 @@ typedef NS_ENUM(NSInteger, CFWorkersSection) {
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
-    if (indexPath.section == CFWorkersSectionKV && indexPath.row < self.namespaces.count) {
+    if (indexPath.section == CFWorkersSectionScripts && indexPath.row < self.scripts.count) {
+        [self showActionsForScript:self.scripts[indexPath.row]];
+    } else if (indexPath.section == CFWorkersSectionRoutes && indexPath.row < self.routes.count) {
+        [self showActionsForRoute:self.routes[indexPath.row]];
+    } else if (indexPath.section == CFWorkersSectionKV && indexPath.row < self.namespaces.count) {
         [self showKeysForNamespace:self.namespaces[indexPath.row]];
     }
 }
@@ -244,6 +256,46 @@ typedef NS_ENUM(NSInteger, CFWorkersSection) {
 }
 
 #pragma mark - Actions
+
+- (void)showActionsForScript:(CFWorkerScript *)script {
+    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:script.name message:nil preferredStyle:UIAlertControllerStyleActionSheet];
+
+    [sheet addAction:[UIAlertAction actionWithTitle:@"Edit Script" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction * _Nonnull action) {
+        CFWorkerScriptEditorViewController *editor = [[CFWorkerScriptEditorViewController alloc] initWithZone:self.zone script:script];
+        [self.navigationController pushViewController:editor animated:YES];
+    }]];
+
+    [sheet addAction:[UIAlertAction actionWithTitle:@"Bind Route" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction * _Nonnull action) {
+        [self addRouteForScript:script];
+    }]];
+
+    [sheet addAction:[UIAlertAction actionWithTitle:@"Open Dashboard" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction * _Nonnull action) {
+        [self openDashboardForScriptName:script.name];
+    }]];
+
+    [sheet addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    [self presentViewController:sheet animated:YES completion:nil];
+}
+
+- (void)showActionsForRoute:(CFWorkerRoute *)route {
+    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:route.pattern message:route.scriptName preferredStyle:UIAlertControllerStyleActionSheet];
+
+    NSURL *routeURL = [self URLFromWorkerRoutePattern:route.pattern];
+    if (routeURL) {
+        [sheet addAction:[UIAlertAction actionWithTitle:@"Open Route URL" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction * _Nonnull action) {
+            [[UIApplication sharedApplication] openURL:routeURL options:@{} completionHandler:nil];
+        }]];
+    }
+
+    if (route.scriptName.length > 0) {
+        [sheet addAction:[UIAlertAction actionWithTitle:@"Open Worker Dashboard" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction * _Nonnull action) {
+            [self openDashboardForScriptName:route.scriptName];
+        }]];
+    }
+
+    [sheet addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    [self presentViewController:sheet animated:YES completion:nil];
+}
 
 - (void)addRouteTapped {
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Add Worker Route"
@@ -282,6 +334,36 @@ typedef NS_ENUM(NSInteger, CFWorkersSection) {
     [self presentViewController:alert animated:YES completion:nil];
 }
 
+- (void)addRouteForScript:(CFWorkerScript *)script {
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Bind Worker Route"
+                                                                   message:@"Bind this Worker to a URL pattern on the current zone."
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    [alert addTextFieldWithConfigurationHandler:^(UITextField * _Nonnull textField) {
+        textField.placeholder = [NSString stringWithFormat:@"%@/*", self.zone.name];
+        textField.text = [NSString stringWithFormat:@"%@/*", self.zone.name];
+        textField.autocapitalizationType = UITextAutocapitalizationTypeNone;
+        textField.autocorrectionType = UITextAutocorrectionTypeNo;
+    }];
+
+    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Bind" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction * _Nonnull action) {
+        NSString *pattern = [alert.textFields.firstObject.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if (pattern.length == 0) {
+            [self showAlertWithTitle:@"Error" message:@"Pattern is required."];
+            return;
+        }
+        [[CFAPIService shared] createWorkerRouteForZoneID:self.zone.zoneID pattern:pattern scriptName:script.name completion:^(CFWorkerRoute * _Nullable route, NSError * _Nullable error) {
+            if (error) {
+                [self showAlertWithTitle:@"Error" message:error.localizedDescription];
+            } else {
+                [self loadData];
+            }
+        }];
+    }]];
+
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
 - (void)showKeysForNamespace:(CFKVNamespace *)namespace {
     [self.activityIndicator startAnimating];
     [[CFAPIService shared] fetchKVKeysForAccountID:self.zone.accountID namespaceID:namespace.namespaceID completion:^(NSArray<NSString *> * _Nullable keys, NSError * _Nullable error) {
@@ -298,6 +380,31 @@ typedef NS_ENUM(NSInteger, CFWorkersSection) {
         [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
         [self presentViewController:alert animated:YES completion:nil];
     }];
+}
+
+- (void)openDashboardForScriptName:(NSString *)scriptName {
+    NSString *encodedScript = [scriptName stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLPathAllowedCharacterSet]];
+    NSString *urlString = [NSString stringWithFormat:@"https://dash.cloudflare.com/%@/workers/services/view/%@/production", self.zone.accountID ?: @"", encodedScript ?: scriptName];
+    NSURL *url = [NSURL URLWithString:urlString];
+    if (url) {
+        [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
+    }
+}
+
+- (NSURL *)URLFromWorkerRoutePattern:(NSString *)pattern {
+    if (pattern.length == 0) {
+        return nil;
+    }
+
+    NSString *cleaned = [pattern stringByReplacingOccurrencesOfString:@"*" withString:@""];
+    cleaned = [cleaned stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    while ([cleaned hasSuffix:@"/"] && cleaned.length > 1) {
+        cleaned = [cleaned substringToIndex:cleaned.length - 1];
+    }
+    if (![cleaned hasPrefix:@"http://"] && ![cleaned hasPrefix:@"https://"]) {
+        cleaned = [@"https://" stringByAppendingString:cleaned];
+    }
+    return [NSURL URLWithString:cleaned];
 }
 
 - (void)showAlertWithTitle:(NSString *)title message:(NSString *)message {

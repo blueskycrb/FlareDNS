@@ -69,6 +69,8 @@ typedef void (^CFAPICompletionBlock)(id _Nullable result, NSError * _Nullable er
 // Workers
 - (void)fetchWorkerScriptsForAccountID:(NSString *)accountID completion:(void (^)(NSArray<CFWorkerScript *> * _Nullable scripts, NSError * _Nullable error))completion;
 - (void)fetchWorkerRoutesForZoneID:(NSString *)zoneID completion:(void (^)(NSArray<CFWorkerRoute *> * _Nullable routes, NSError * _Nullable error))completion;
+- (void)fetchWorkerScriptContentForAccountID:(NSString *)accountID scriptName:(NSString *)scriptName completion:(void (^)(NSString * _Nullable content, NSError * _Nullable error))completion;
+- (void)updateWorkerScriptContentForAccountID:(NSString *)accountID scriptName:(NSString *)scriptName content:(NSString *)content completion:(void (^)(BOOL success, NSError * _Nullable error))completion;
 - (void)createWorkerRouteForZoneID:(NSString *)zoneID pattern:(NSString *)pattern scriptName:(NSString *)scriptName completion:(void (^)(CFWorkerRoute * _Nullable route, NSError * _Nullable error))completion;
 - (void)deleteWorkerRouteWithID:(NSString *)routeID forZoneID:(NSString *)zoneID completion:(void (^)(BOOL success, NSError * _Nullable error))completion;
 - (void)fetchKVNamespacesForAccountID:(NSString *)accountID completion:(void (^)(NSArray<CFKVNamespace *> * _Nullable namespaces, NSError * _Nullable error))completion;
