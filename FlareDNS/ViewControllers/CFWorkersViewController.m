@@ -9,7 +9,8 @@
 #import "UIColor+FlareDNS.h"
 
 typedef NS_ENUM(NSInteger, CFWorkersSection) {
-    CFWorkersSectionScripts = 0,
+    CFWorkersSectionPages = 0,
+    CFWorkersSectionScripts,
     CFWorkersSectionRoutes,
     CFWorkersSectionKV,
     CFWorkersSectionCount
@@ -20,6 +21,7 @@ typedef NS_ENUM(NSInteger, CFWorkersSection) {
 @property (nonatomic, strong) CFZone *zone;
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) UIActivityIndicatorView *activityIndicator;
+@property (nonatomic, copy) NSArray<CFPagesProject *> *pagesProjects;
 @property (nonatomic, copy) NSArray<CFWorkerScript *> *scripts;
 @property (nonatomic, copy) NSArray<CFWorkerRoute *> *routes;
 @property (nonatomic, copy) NSArray<CFKVNamespace *> *namespaces;
@@ -32,6 +34,7 @@ typedef NS_ENUM(NSInteger, CFWorkersSection) {
     self = [super init];
     if (self) {
         _zone = zone;
+        _pagesProjects = @[];
         _scripts = @[];
         _routes = @[];
         _namespaces = @[];
@@ -41,7 +44,7 @@ typedef NS_ENUM(NSInteger, CFWorkersSection) {
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.title = @"Workers & KV";
+    self.title = @"Workers & Pages";
     self.navigationItem.largeTitleDisplayMode = UINavigationItemLargeTitleDisplayModeNever;
     self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemAdd target:self action:@selector(addRouteTapped)];
     [self setupUI];
@@ -86,6 +89,16 @@ typedef NS_ENUM(NSInteger, CFWorkersSection) {
     [self.activityIndicator startAnimating];
     dispatch_group_t group = dispatch_group_create();
     __block NSError *firstError = nil;
+
+    dispatch_group_enter(group);
+    [[CFAPIService shared] fetchPagesProjectsForAccountID:self.zone.accountID completion:^(NSArray<CFPagesProject *> * _Nullable projects, NSError * _Nullable error) {
+        if (!error) {
+            self.pagesProjects = projects ?: @[];
+        } else if (!firstError) {
+            firstError = error;
+        }
+        dispatch_group_leave(group);
+    }];
 
     dispatch_group_enter(group);
     [[CFAPIService shared] fetchWorkerScriptsForAccountID:self.zone.accountID completion:^(NSArray<CFWorkerScript *> * _Nullable scripts, NSError * _Nullable error) {
@@ -134,6 +147,7 @@ typedef NS_ENUM(NSInteger, CFWorkersSection) {
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     switch (section) {
+        case CFWorkersSectionPages: return MAX(self.pagesProjects.count, 1);
         case CFWorkersSectionScripts: return MAX(self.scripts.count, 1);
         case CFWorkersSectionRoutes: return MAX(self.routes.count, 1);
         case CFWorkersSectionKV: return MAX(self.namespaces.count, 1);
@@ -143,6 +157,7 @@ typedef NS_ENUM(NSInteger, CFWorkersSection) {
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
     switch (section) {
+        case CFWorkersSectionPages: return @"PAGES PROJECTS";
         case CFWorkersSectionScripts: return @"WORKER SCRIPTS";
         case CFWorkersSectionRoutes: return @"WORKER ROUTES";
         case CFWorkersSectionKV: return @"KV NAMESPACES";
@@ -151,6 +166,9 @@ typedef NS_ENUM(NSInteger, CFWorkersSection) {
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
+    if (section == CFWorkersSectionPages) {
+        return @"Tap a Pages project to open its production domain, latest deployment URL, or Dashboard.";
+    }
     if (section == CFWorkersSectionScripts) {
         return @"Tap a script to edit code, bind a route, or open it in Cloudflare Dashboard.";
     }
@@ -177,7 +195,20 @@ typedef NS_ENUM(NSInteger, CFWorkersSection) {
         cell.detailTextLabel.textColor = [UIColor cf_secondaryTextColor];
     }
 
-    if (indexPath.section == CFWorkersSectionScripts) {
+    if (indexPath.section == CFWorkersSectionPages) {
+        if (self.pagesProjects.count == 0) {
+            cell.textLabel.text = @"No Pages projects";
+            cell.detailTextLabel.text = @"Pages permissions are required to list projects.";
+            return cell;
+        }
+        CFPagesProject *project = self.pagesProjects[indexPath.row];
+        cell.textLabel.text = project.name;
+        cell.detailTextLabel.text = [project displayURLString] ?: @"Tap to open project links";
+        cell.imageView.image = [UIImage systemImageNamed:@"globe"];
+        cell.imageView.tintColor = [UIColor systemCyanColor];
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+    } else if (indexPath.section == CFWorkersSectionScripts) {
         if (self.scripts.count == 0) {
             cell.textLabel.text = @"No Worker scripts";
             cell.detailTextLabel.text = @"Create scripts in Cloudflare or deploy with Wrangler.";
@@ -225,7 +256,9 @@ typedef NS_ENUM(NSInteger, CFWorkersSection) {
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
-    if (indexPath.section == CFWorkersSectionScripts && indexPath.row < self.scripts.count) {
+    if (indexPath.section == CFWorkersSectionPages && indexPath.row < self.pagesProjects.count) {
+        [self showActionsForPagesProject:self.pagesProjects[indexPath.row]];
+    } else if (indexPath.section == CFWorkersSectionScripts && indexPath.row < self.scripts.count) {
         [self showActionsForScript:self.scripts[indexPath.row]];
     } else if (indexPath.section == CFWorkersSectionRoutes && indexPath.row < self.routes.count) {
         [self showActionsForRoute:self.routes[indexPath.row]];
@@ -256,6 +289,37 @@ typedef NS_ENUM(NSInteger, CFWorkersSection) {
 }
 
 #pragma mark - Actions
+
+- (void)showActionsForPagesProject:(CFPagesProject *)project {
+    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:project.name message:project.latestCommitMessage preferredStyle:UIAlertControllerStyleActionSheet];
+
+    NSString *primaryURL = [project primaryURLString];
+    if (primaryURL.length > 0) {
+        [sheet addAction:[UIAlertAction actionWithTitle:@"Open Production URL" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction * _Nonnull action) {
+            [self openURLString:primaryURL];
+        }]];
+    }
+
+    if (project.latestDeploymentURL.length > 0) {
+        [sheet addAction:[UIAlertAction actionWithTitle:@"Open Latest Deployment" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction * _Nonnull action) {
+            [self openURLString:project.latestDeploymentURL];
+        }]];
+    }
+
+    for (NSString *domain in project.domains) {
+        NSString *urlString = ([domain hasPrefix:@"http://"] || [domain hasPrefix:@"https://"]) ? domain : [@"https://" stringByAppendingString:domain];
+        [sheet addAction:[UIAlertAction actionWithTitle:[NSString stringWithFormat:@"Open %@", domain] style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction * _Nonnull action) {
+            [self openURLString:urlString];
+        }]];
+    }
+
+    [sheet addAction:[UIAlertAction actionWithTitle:@"Open Pages Dashboard" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction * _Nonnull action) {
+        [self openPagesDashboardForProjectName:project.name];
+    }]];
+
+    [sheet addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    [self presentViewController:sheet animated:YES completion:nil];
+}
 
 - (void)showActionsForScript:(CFWorkerScript *)script {
     UIAlertController *sheet = [UIAlertController alertControllerWithTitle:script.name message:nil preferredStyle:UIAlertControllerStyleActionSheet];
@@ -382,9 +446,19 @@ typedef NS_ENUM(NSInteger, CFWorkersSection) {
     }];
 }
 
+- (void)openPagesDashboardForProjectName:(NSString *)projectName {
+    NSString *encodedProject = [projectName stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLPathAllowedCharacterSet]];
+    NSString *urlString = [NSString stringWithFormat:@"https://dash.cloudflare.com/%@/pages/view/%@", self.zone.accountID ?: @"", encodedProject ?: projectName];
+    [self openURLString:urlString];
+}
+
 - (void)openDashboardForScriptName:(NSString *)scriptName {
     NSString *encodedScript = [scriptName stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLPathAllowedCharacterSet]];
     NSString *urlString = [NSString stringWithFormat:@"https://dash.cloudflare.com/%@/workers/services/view/%@/production", self.zone.accountID ?: @"", encodedScript ?: scriptName];
+    [self openURLString:urlString];
+}
+
+- (void)openURLString:(NSString *)urlString {
     NSURL *url = [NSURL URLWithString:urlString];
     if (url) {
         [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];

@@ -691,6 +691,36 @@ static NSString *const kBaseURL = @"https://api.cloudflare.com/client/v4";
     }];
 }
 
+
+- (void)fetchPagesProjectsForAccountID:(NSString *)accountID completion:(void (^)(NSArray<CFPagesProject *> * _Nullable, NSError * _Nullable))completion {
+    NSString *path = [NSString stringWithFormat:@"/accounts/%@/pages/projects?per_page=100", accountID];
+    NSMutableURLRequest *request = [self requestWithPath:path method:@"GET"];
+
+    [self performRequest:request completion:^(id result, NSError *error) {
+        if (error) {
+            completion(nil, error);
+            return;
+        }
+
+        NSArray *items = nil;
+        if ([result isKindOfClass:[NSArray class]]) {
+            items = result;
+        } else if ([result isKindOfClass:[NSDictionary class]]) {
+            id candidate = result[@"result"] ?: result[@"items"];
+            if ([candidate isKindOfClass:[NSArray class]]) {
+                items = candidate;
+            }
+        }
+
+        NSMutableArray<CFPagesProject *> *projects = [NSMutableArray array];
+        for (NSDictionary *dict in items ?: @[]) {
+            if ([dict isKindOfClass:[NSDictionary class]]) {
+                [projects addObject:[CFPagesProject projectFromDictionary:dict]];
+            }
+        }
+        completion(projects, nil);
+    }];
+}
 - (void)fetchWorkerRoutesForZoneID:(NSString *)zoneID completion:(void (^)(NSArray<CFWorkerRoute *> * _Nullable, NSError * _Nullable))completion {
     NSString *path = [NSString stringWithFormat:@"/zones/%@/workers/routes", zoneID];
     NSMutableURLRequest *request = [self requestWithPath:path method:@"GET"];

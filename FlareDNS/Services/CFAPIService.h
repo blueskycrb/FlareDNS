@@ -14,6 +14,7 @@
 #import "CFWorkerRoute.h"
 #import "CFKVNamespace.h"
 #import "CFRulesetRule.h"
+#import "CFPagesProject.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -68,6 +69,7 @@ typedef void (^CFAPICompletionBlock)(id _Nullable result, NSError * _Nullable er
 - (void)deleteRuleWithID:(NSString *)ruleID forZoneID:(NSString *)zoneID phase:(CFRulesetPhase)phase completion:(void (^)(BOOL success, NSError * _Nullable error))completion;
 // Workers
 - (void)fetchWorkerScriptsForAccountID:(NSString *)accountID completion:(void (^)(NSArray<CFWorkerScript *> * _Nullable scripts, NSError * _Nullable error))completion;
+- (void)fetchPagesProjectsForAccountID:(NSString *)accountID completion:(void (^)(NSArray<CFPagesProject *> * _Nullable projects, NSError * _Nullable error))completion;
 - (void)fetchWorkerRoutesForZoneID:(NSString *)zoneID completion:(void (^)(NSArray<CFWorkerRoute *> * _Nullable routes, NSError * _Nullable error))completion;
 - (void)fetchWorkerScriptContentForAccountID:(NSString *)accountID scriptName:(NSString *)scriptName completion:(void (^)(NSString * _Nullable content, NSError * _Nullable error))completion;
 - (void)updateWorkerScriptContentForAccountID:(NSString *)accountID scriptName:(NSString *)scriptName content:(NSString *)content completion:(void (^)(BOOL success, NSError * _Nullable error))completion;
