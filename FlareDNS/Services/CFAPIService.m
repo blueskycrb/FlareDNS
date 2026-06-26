@@ -693,7 +693,7 @@ static NSString *const kBaseURL = @"https://api.cloudflare.com/client/v4";
 
 
 - (void)fetchPagesProjectsForAccountID:(NSString *)accountID completion:(void (^)(NSArray<CFPagesProject *> * _Nullable, NSError * _Nullable))completion {
-    NSString *path = [NSString stringWithFormat:@"/accounts/%@/pages/projects?per_page=100", accountID];
+    NSString *path = [NSString stringWithFormat:@"/accounts/%@/pages/projects", accountID];
     NSMutableURLRequest *request = [self requestWithPath:path method:@"GET"];
 
     [self performRequest:request completion:^(id result, NSError *error) {

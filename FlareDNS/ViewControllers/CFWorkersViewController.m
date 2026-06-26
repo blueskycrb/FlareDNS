@@ -22,6 +22,7 @@ typedef NS_ENUM(NSInteger, CFWorkersSection) {
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) UIActivityIndicatorView *activityIndicator;
 @property (nonatomic, copy) NSArray<CFPagesProject *> *pagesProjects;
+@property (nonatomic, copy, nullable) NSString *pagesErrorMessage;
 @property (nonatomic, copy) NSArray<CFWorkerScript *> *scripts;
 @property (nonatomic, copy) NSArray<CFWorkerRoute *> *routes;
 @property (nonatomic, copy) NSArray<CFKVNamespace *> *namespaces;
@@ -35,6 +36,7 @@ typedef NS_ENUM(NSInteger, CFWorkersSection) {
     if (self) {
         _zone = zone;
         _pagesProjects = @[];
+        _pagesErrorMessage = nil;
         _scripts = @[];
         _routes = @[];
         _namespaces = @[];
@@ -94,8 +96,10 @@ typedef NS_ENUM(NSInteger, CFWorkersSection) {
     [[CFAPIService shared] fetchPagesProjectsForAccountID:self.zone.accountID completion:^(NSArray<CFPagesProject *> * _Nullable projects, NSError * _Nullable error) {
         if (!error) {
             self.pagesProjects = projects ?: @[];
-        } else if (!firstError) {
-            firstError = error;
+            self.pagesErrorMessage = nil;
+        } else {
+            self.pagesProjects = @[];
+            self.pagesErrorMessage = error.localizedDescription;
         }
         dispatch_group_leave(group);
     }];
@@ -198,7 +202,7 @@ typedef NS_ENUM(NSInteger, CFWorkersSection) {
     if (indexPath.section == CFWorkersSectionPages) {
         if (self.pagesProjects.count == 0) {
             cell.textLabel.text = @"No Pages projects";
-            cell.detailTextLabel.text = @"Pages permissions are required to list projects.";
+            cell.detailTextLabel.text = self.pagesErrorMessage.length > 0 ? self.pagesErrorMessage : @"No Pages projects found for this account.";
             return cell;
         }
         CFPagesProject *project = self.pagesProjects[indexPath.row];
